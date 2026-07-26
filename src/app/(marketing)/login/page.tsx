@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { isDemoMode } from '@/lib/config';
 import { createClient } from '@/lib/supabase/client';
+import { useT } from '@/i18n/locale-context';
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useT();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const demo = isDemoMode();
@@ -74,12 +76,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="rounded-2xl border border-[#e4e4e0] bg-white/90 p-6 md:p-8 shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">
-            {demo ? 'Try Conductor without an account.' : 'Sign in'}
+            {demo ? t('login.demoTitle') : t('login.title')}
           </h1>
           <p className="text-sm text-[#6b6b66] mt-2">
-            {demo
-              ? 'Explore the command tower with a local demo session — no signup required.'
-              : 'Sign in with email or GitHub.'}
+            {demo ? t('login.demoBody') : t('login.prodBody')}
           </p>
 
           {demo ? (
@@ -90,18 +90,14 @@ export default function LoginPage() {
                 disabled={loading}
                 aria-busy={loading}
               >
-                {loading ? 'Entering demo…' : 'Enter demo'}
+                {loading ? t('login.enteringDemo') : t('login.enterDemo')}
               </Button>
-              <p className="mt-5 text-xs text-[#6b6b66] leading-relaxed">
-                You&apos;ll get a local command tower with Research Crew, realtime
-                status, and full escalation flow.
-              </p>
             </>
           ) : (
             <>
               <form onSubmit={magicLink} className="mt-6 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t('login.email')}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -114,7 +110,7 @@ export default function LoginPage() {
                 </div>
                 <Button type="submit" className="w-full min-h-12" disabled={loading}>
                   <Mail className="h-4 w-4" />
-                  Send magic link
+                  {t('login.magic')}
                 </Button>
               </form>
 
@@ -132,19 +128,19 @@ export default function LoginPage() {
                 type="button"
               >
                 <Github className="h-4 w-4" />
-                Continue with GitHub
+                {t('login.github')}
               </Button>
             </>
           )}
 
           <p className="mt-6 text-xs text-[#6b6b66]">
-            By continuing you agree to our{' '}
+            {t('login.agree')}{' '}
             <Link href="/terms" className="underline underline-offset-2">
-              Terms
+              {t('login.terms')}
             </Link>{' '}
-            and{' '}
+            {t('login.and')}{' '}
             <Link href="/privacy" className="underline underline-offset-2">
-              Privacy Policy
+              {t('login.privacy')}
             </Link>
             .
           </p>

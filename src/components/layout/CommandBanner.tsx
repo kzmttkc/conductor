@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { AlertTriangle, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useEscalations } from '@/hooks/useEscalations';
+import { useT } from '@/i18n/locale-context';
 
 export function CommandBanner({ userId }: { userId: string }) {
   const { escalations } = useEscalations(userId);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const playedFor = useRef<Set<string>>(new Set());
   const top = escalations[0];
+  const t = useT();
 
   useEffect(() => {
     if (!top || playedFor.current.has(top.id)) return;
@@ -46,7 +48,7 @@ export function CommandBanner({ userId }: { userId: string }) {
         <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide opacity-90">
-            Needs you · {escalations.length} pending
+            {t('app.needsPending', { n: escalations.length })}
           </p>
           <p className="text-sm truncate">{top.summary}</p>
         </div>
@@ -54,11 +56,11 @@ export function CommandBanner({ userId }: { userId: string }) {
           href={`/escalations/${top.id}`}
           className="shrink-0 rounded-md bg-white text-urgent text-xs font-semibold px-3 py-1.5 hover:bg-white/90"
         >
-          Decide
+          {t('app.decide')}
         </Link>
         <button
           type="button"
-          aria-label="Dismiss banner"
+          aria-label={t('a11y.dismissBanner')}
           className="opacity-80 hover:opacity-100"
           onClick={() => setDismissed(top.id)}
         >

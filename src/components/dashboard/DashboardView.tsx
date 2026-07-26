@@ -10,12 +10,22 @@ import { PublicDemoTour } from '@/components/demo/PublicDemoTour';
 import { SortableAgentGrid } from '@/components/dashboard/SortableAgentGrid';
 import type { Artifact, Escalation } from '@/lib/supabase/types';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { useLocale, useT } from '@/i18n/locale-context';
+import { formatArtifactTitle, formatEscalationSummary } from '@/i18n/format-content';
+import { readAgentLabelsJa } from '@/i18n/agent-labels-client';
 
 export function DashboardView({ userId }: { userId: string }) {
   const { agents, loading } = useAgents(userId);
   const { escalations } = useEscalations(userId);
   const [reportAgentIds, setReportAgentIds] = useState<Set<string>>(new Set());
   const [recentArtifacts, setRecentArtifacts] = useState<Artifact[]>([]);
+  const [customMap, setCustomMap] = useState<Record<string, string>>({});
+  const t = useT();
+  const { locale } = useLocale();
+
+  useEffect(() => {
+    setCustomMap(readAgentLabelsJa());
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -49,13 +59,13 @@ export function DashboardView({ userId }: { userId: string }) {
         <div>
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             <Radio className="h-3.5 w-3.5 text-success" />
-            Live overview
+            {t('app.liveOverview')}
           </p>
           <h1 className="font-display text-3xl md:text-4xl tracking-tight mt-1">
-            Dashboard
+            {t('nav.dashboard')}
           </h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-lg">
-            See who is working, who needs you, and what is ready to read.
+            {t('app.dashboardBlurb')}
           </p>
         </div>
         {primaryCtaIsResolve ? (
@@ -68,42 +78,42 @@ export function DashboardView({ userId }: { userId: string }) {
               }
             >
               <AlertTriangle className="h-4 w-4" />
-              Resolve needs
+              {t('app.resolveNeeds')}
             </Link>
           </Button>
         ) : (
           <Button asChild size="lg">
             <Link href="/templates">
               <Play className="h-4 w-4" />
-              Launch template
+              {t('app.launchTemplate')}
             </Link>
           </Button>
         )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Running" value={running} />
+        <Stat label={t('status.running')} value={running} />
         <Stat
-          label="Needs You"
+          label={t('needsYou.title')}
           value={needsYou}
           tone={needsYou > 0 ? 'urgent' : 'default'}
           href="/escalations"
         />
-        <Stat label="Completed" value={completed} href="/results" />
+        <Stat label={t('status.completed')} value={completed} href="/results" />
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mr-2" />
-          Syncing agents…
+          {t('common.loading')}
         </div>
       ) : agents.length === 0 ? (
         <EmptyState />
       ) : (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium">Crew</h2>
-            <p className="text-xs text-muted-foreground">Drag to reorder</p>
+            <h2 className="text-sm font-medium">{t('nav.agents')}</h2>
+            <p className="text-xs text-muted-foreground">{t('dashboard.dragReorder')}</p>
           </div>
           <SortableAgentGrid agents={agents} reportAgentIds={reportAgentIds} />
         </section>
@@ -113,13 +123,13 @@ export function DashboardView({ userId }: { userId: string }) {
         <section className="grid gap-4 md:grid-cols-2 pt-2">
           <div className="rounded-xl border border-border bg-card/80 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">Recent escalations</h2>
+              <h2 className="text-sm font-medium">{t('needsYou.needsNow')}</h2>
               <Link href="/escalations" className="text-xs text-muted-foreground hover:text-foreground">
-                All →
+                {t('needsYou.all')} →
               </Link>
             </div>
             {escalations.length === 0 ? (
-              <p className="text-sm text-muted-foreground">None pending.</p>
+              <p className="text-sm text-muted-foreground">{t('needsYou.emptyTitle')}</p>
             ) : (
               <ul className="space-y-2">
                 {escalations.slice(0, 3).map((e) => (
@@ -128,7 +138,9 @@ export function DashboardView({ userId }: { userId: string }) {
                       href={`/escalations/${e.id}`}
                       className="block rounded-lg border border-urgent/25 bg-urgent/5 px-3 py-2.5 text-sm hover:bg-urgent/10 transition-colors"
                     >
-                      <span className="line-clamp-2">{e.summary}</span>
+                      <span className="line-clamp-2">
+                        {formatEscalationSummary(e.summary, e.context, t)}
+                      </span>
                     </Link>
                   </li>
                 ))}
@@ -137,13 +149,13 @@ export function DashboardView({ userId }: { userId: string }) {
           </div>
           <div className="rounded-xl border border-border bg-card/80 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">Recent results</h2>
+              <h2 className="text-sm font-medium">{t('results.title')}</h2>
               <Link href="/results" className="text-xs text-muted-foreground hover:text-foreground">
-                All →
+                {t('results.all')} →
               </Link>
             </div>
             {recentArtifacts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No reports yet.</p>
+              <p className="text-sm text-muted-foreground">{t('results.emptyTitle')}</p>
             ) : (
               <ul className="space-y-2">
                 {recentArtifacts.map((a) => (
@@ -152,9 +164,11 @@ export function DashboardView({ userId }: { userId: string }) {
                       href={`/results/${a.id}`}
                       className="block rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
                     >
-                      <span className="font-medium line-clamp-1">{a.title}</span>
+                      <span className="font-medium line-clamp-1">
+                        {formatArtifactTitle(a.title, t, { customMap })}
+                      </span>
                       <span className="block text-xs text-muted-foreground mt-0.5">
-                        {formatRelativeTime(a.created_at)}
+                        {formatRelativeTime(a.created_at, locale)}
                       </span>
                     </Link>
                   </li>
@@ -175,6 +189,8 @@ function NeedsYouBar({
   count: number;
   escalation?: Escalation;
 }) {
+  const t = useT();
+
   return (
     <Link
       href={escalation ? `/escalations/${escalation.id}` : '/escalations'}
@@ -186,14 +202,16 @@ function NeedsYouBar({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/95">
-            Needs You · {count}
+            {t('app.needsPending', { n: count })}
           </p>
           <p className="text-sm md:text-base font-medium line-clamp-2 mt-0.5">
-            {escalation?.summary || 'An agent is waiting for your decision.'}
+            {escalation
+              ? formatEscalationSummary(escalation.summary, escalation.context, t)
+              : t('dashboard.waitingDecision')}
           </p>
         </div>
         <span className="shrink-0 min-h-11 inline-flex items-center text-sm font-bold bg-white text-urgent rounded-md px-4">
-          Decide
+          {t('app.decide')}
         </span>
       </div>
     </Link>
@@ -233,16 +251,16 @@ function Stat({
 }
 
 function EmptyState() {
+  const t = useT();
+
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
-      <h2 className="font-display text-2xl">Launch a template</h2>
-      <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-        Start with Solo Scout or Content Pipeline on Free — then decide when they ask.
-      </p>
+      <h2 className="font-display text-2xl">{t('app.launchTemplate')}</h2>
+      <p className="text-muted-foreground mt-2 max-w-md mx-auto">{t('templates.blurb')}</p>
       <Button asChild size="lg" className="mt-6">
         <Link href="/templates">
           <Play className="h-4 w-4" />
-          Launch template
+          {t('app.launchTemplate')}
         </Link>
       </Button>
     </div>

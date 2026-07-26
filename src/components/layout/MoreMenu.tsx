@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Library, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+import { LocaleToggle } from '@/components/i18n/LocaleToggle';
+import { useT } from '@/i18n/locale-context';
 
 type Props = {
   userName: string;
@@ -22,6 +24,7 @@ export function MoreMenu({
   className,
 }: Props) {
   const { theme, setTheme } = useTheme();
+  const t = useT();
   if (!open) return null;
 
   return (
@@ -38,6 +41,9 @@ export function MoreMenu({
       <p className="px-2.5 py-1.5 text-[11px] text-muted-foreground truncate">
         {userName}
       </p>
+      <div className="px-2.5 py-1.5">
+        <LocaleToggle tone="app" />
+      </div>
       <Link
         href="/templates"
         onClick={onClose}
@@ -45,7 +51,7 @@ export function MoreMenu({
         role="menuitem"
       >
         <Library className="h-4 w-4" />
-        Templates
+        {t('nav.templates')}
       </Link>
       <Link
         href="/settings"
@@ -54,7 +60,7 @@ export function MoreMenu({
         role="menuitem"
       >
         <Settings className="h-4 w-4" />
-        Settings
+        {t('nav.settings')}
       </Link>
       <Link
         href="/help"
@@ -62,7 +68,7 @@ export function MoreMenu({
         className="flex min-h-11 items-center gap-2 rounded-lg px-2.5 py-2 text-sm hover:bg-muted"
         role="menuitem"
       >
-        Help
+        {t('nav.help')}
       </Link>
       <button
         type="button"
@@ -72,7 +78,7 @@ export function MoreMenu({
       >
         <Sun className="h-4 w-4 dark:hidden" />
         <Moon className="hidden h-4 w-4 dark:block" />
-        Theme
+        {t('nav.theme')}
       </button>
       <form action="/auth/signout" method="post">
         <button
@@ -81,7 +87,7 @@ export function MoreMenu({
           role="menuitem"
         >
           <LogOut className="h-4 w-4" />
-          Sign out
+          {t('nav.signOut')}
         </button>
       </form>
     </div>

@@ -4,12 +4,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { isDemoMode } from '@/lib/config';
 import type { Escalation } from '@/lib/supabase/types';
+import { getMessages, translate } from '@/i18n/get-messages';
+import type { Locale } from '@/i18n/types';
+import { formatEscalationSummary } from '@/i18n/format-content';
+
+function currentLocale(): Locale {
+  if (typeof document === 'undefined') return 'en';
+  return document.documentElement.lang === 'ja' ? 'ja' : 'en';
+}
 
 function notifyNew(item: Escalation) {
-  toast.message('Agent needs you', {
-    description: item.summary.slice(0, 120),
+  const m = getMessages(currentLocale());
+  const t = (path: string, vars?: Record<string, string | number>) =>
+    translate(m, path, vars);
+  const summary = formatEscalationSummary(item.summary, item.context, t);
+  toast.message(translate(m, 'needsYou.toastTitle'), {
+    description: summary.slice(0, 120),
     action: {
-      label: 'Decide',
+      label: translate(m, 'app.decide'),
       onClick: () => {
         window.location.href = `/escalations/${item.id}`;
       },

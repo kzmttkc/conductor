@@ -10,6 +10,7 @@ import {
   startProdAgent,
 } from '@/lib/runtime/prod-runner';
 import { RuntimeError } from '@/lib/runtime/errors';
+import { getServerLocale } from '@/i18n/locale-server';
 
 function recentErrors<T extends { type: string }>(logs: T[]) {
   return logs.filter((l) => l.type === 'error').slice(-10).reverse();
@@ -69,8 +70,9 @@ export async function PATCH(
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       try {
+        const locale = await getServerLocale();
         if (body.action === 'start') {
-          await store.startRuntime(id);
+          await store.startRuntime(id, null, locale);
           return NextResponse.json(store.getAgent(id));
         }
         if (body.action === 'stop') {
@@ -78,7 +80,10 @@ export async function PATCH(
           return NextResponse.json(store.getAgent(id));
         }
         if (body.action === 'recover' || body.action === 'retry') {
-          await store.recoverAgent(id, { allowWebSearch: Boolean(body.allow_web_search) });
+          await store.recoverAgent(id, {
+            allowWebSearch: Boolean(body.allow_web_search),
+            locale,
+          });
           return NextResponse.json(store.getAgent(id));
         }
         if (body.permissions) {
@@ -94,6 +99,19 @@ export async function PATCH(
             }
           }
           return NextResponse.json(store.updateAgent(id, { permissions }));
+        }
+        if (body.config && typeof body.config === 'object') {
+          const patch = body.config as Record<string, unknown>;
+          const nextConfig = { ...agent.config };
+          if ('display_name_ja' in patch) {
+            const v = patch.display_name_ja;
+            if (v === null || v === '') {
+              delete nextConfig.display_name_ja;
+            } else if (typeof v === 'string') {
+              nextConfig.display_name_ja = v.trim().slice(0, 80);
+            }
+          }
+          return NextResponse.json(store.updateAgent(id, { config: nextConfig }));
         }
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
       } catch (e) {
@@ -117,13 +135,14 @@ export async function PATCH(
   if (!agent) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   try {
+    const locale = await getServerLocale();
     if (body.action === 'start') {
-      await startProdAgent(id);
+      await startProdAgent(id, null, locale);
       return NextResponse.json(await data.getAgentForUser(user.id, id));
     }
     if (body.action === 'stop') {
       return NextResponse.json(
-        await data.updateAgent(id, { status: 'idle', current_task: 'Stopped by commander' })
+        await data.updateAgent(id, { status: 'idle', current_task: 'Stopped by user' })
       );
     }
     if (body.action === 'recover' || body.action === 'retry') {
@@ -131,17 +150,32 @@ export async function PATCH(
         await data.updateAgent(id, {
           permissions: { ...agent.permissions, web_search: 'allow' },
         });
-        await data.insertLog(id, 'action', 'Commander loosened web_search → Allow for retry');
+        await data.insertLog(id, 'action', 'web_search loosened → Allow for retry', {
+          i18nKey: 'log.searchAllowedRetry',
+        });
       }
-      await recoverProdAgent(id);
+      await recoverProdAgent(id, locale);
       return NextResponse.json(await data.getAgentForUser(user.id, id));
     }
     if (body.permissions) {
       const permissions = data.normalizePermissionsPatch(agent.permissions, body.permissions);
       return NextResponse.json(await data.updateAgent(id, { permissions }));
     }
+    if (body.config && typeof body.config === 'object') {
+      const patch = body.config as Record<string, unknown>;
+      const nextConfig = { ...agent.config };
+      if ('display_name_ja' in patch) {
+        const v = patch.display_name_ja;
+        if (v === null || v === '') {
+          delete nextConfig.display_name_ja;
+        } else if (typeof v === 'string') {
+          nextConfig.display_name_ja = v.trim().slice(0, 80);
+        }
+      }
+      return NextResponse.json(await data.updateAgent(id, { config: nextConfig }));
+    }
     if (body.action === 'resume' && body.human_response) {
-      await resumeProdAgent(id, String(body.human_response));
+      await resumeProdAgent(id, String(body.human_response), locale);
       return NextResponse.json(await data.getAgentForUser(user.id, id));
     }
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

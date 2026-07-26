@@ -10,6 +10,7 @@ import { CommandBanner } from '@/components/layout/CommandBanner';
 import { CommandNav } from '@/components/layout/CommandNav';
 import { MoreMenu } from '@/components/layout/MoreMenu';
 import { BrandInline } from '@/components/brand';
+import { useT } from '@/i18n/locale-context';
 
 export function AppShell({
   children,
@@ -24,6 +25,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const { escalations } = useEscalations(userId);
+  const t = useT();
   const pendingCount = escalations.length || initialPending;
   const hideMobileBar = pathname.startsWith('/escalations/');
   const [moreOpen, setMoreOpen] = useState(false);
@@ -43,26 +45,26 @@ export function AppShell({
   }, [moreOpen]);
 
   const pageTitle = pathname.startsWith('/agents')
-    ? 'Agents'
+    ? t('nav.agents')
     : pathname.startsWith('/escalations')
-      ? 'Needs You'
+      ? t('needsYou.title')
       : pathname.startsWith('/results')
-        ? 'Results'
+        ? t('nav.results')
         : pathname.startsWith('/templates')
-          ? 'Templates'
+          ? t('nav.templates')
           : pathname.startsWith('/settings')
-            ? 'Settings'
+            ? t('nav.settings')
             : pathname.startsWith('/help')
-              ? 'Help'
-              : 'Dashboard';
+              ? t('nav.help')
+              : t('nav.dashboard');
 
   const moreControl = (
     <div className="relative" ref={moreRef}>
       <button
         type="button"
         onClick={() => setMoreOpen((v) => !v)}
-        title="More"
-        aria-label="More"
+        title={t('nav.more')}
+        aria-label={t('nav.more')}
         aria-expanded={moreOpen}
         className={cn(
           'group relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-150',
@@ -76,7 +78,7 @@ export function AppShell({
       >
         <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
         <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
-          More
+          {t('nav.more')}
         </span>
       </button>
       <MoreMenu
@@ -122,7 +124,7 @@ export function AppShell({
               }
               className="shrink-0 min-h-9 inline-flex items-center text-xs font-semibold text-white bg-urgent px-3 rounded-md animate-pulse transition-opacity duration-150 hover:opacity-90"
             >
-              Needs You · {pendingCount}
+              {t('app.needsPending', { n: pendingCount })}
             </Link>
           ) : (
             <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[40%]">

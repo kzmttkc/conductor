@@ -7,6 +7,7 @@ import * as data from '@/lib/supabase/data';
 import { startProdAgent } from '@/lib/runtime/prod-runner';
 import { RuntimeError } from '@/lib/runtime/errors';
 import { clipText } from '@/lib/security/validate';
+import { getServerLocale } from '@/i18n/locale-server';
 
 export async function GET(request: Request) {
   if (isDemoMode()) {
@@ -42,27 +43,37 @@ export async function POST(request: Request) {
         store.assertUsageBudget(user.id);
       } catch (e) {
         const err = e as Error & { upgrade_to?: string };
+        const usageErr = err as Error & {
+          upgrade_to?: string;
+          plan?: string;
+          n?: number;
+          metric?: string;
+        };
         return NextResponse.json(
           {
-            error: err.message,
+            error: usageErr.message,
             code: 'USAGE_LIMIT',
-            upgrade_to: err.upgrade_to,
+            upgrade_to: usageErr.upgrade_to,
+            plan: usageErr.plan ?? plan,
+            n: usageErr.n,
+            metric: usageErr.metric,
           },
           { status: 403 }
         );
       }
 
+      const locale = await getServerLocale();
       const agent = store.createAgent({
         user_id: user.id,
         name: clipText(body.name, 80) || 'Agent',
         role: clipText(body.role, 80) || 'Operator',
         current_task: clipText(body.current_task ?? body.goal ?? '', 500) || null,
         permissions: body.permissions ?? {},
-        config: body.config ?? {},
+        config: { ...(body.config ?? {}), locale },
         status: 'idle',
       });
       try {
-        if (body.start) await store.startRuntime(agent.id);
+        if (body.start) await store.startRuntime(agent.id, null, locale);
       } catch (e) {
         if (e instanceof RuntimeError && e.code === 'conflict') {
           return NextResponse.json({ error: e.message, code: 'CONFLICT' }, { status: 409 });
@@ -87,17 +98,18 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+  const locale = await getServerLocale();
   const agent = await data.createAgentRow({
     user_id: user.id,
     name: clipText(body.name, 80) || 'Agent',
     role: clipText(body.role, 80) || 'Operator',
     current_task: clipText(body.current_task ?? body.goal ?? '', 500) || null,
     permissions: body.permissions ?? {},
-    config: body.config ?? {},
+    config: { ...(body.config ?? {}), locale },
     status: 'idle',
   });
   try {
-    if (body.start) await startProdAgent(agent.id);
+    if (body.start) await startProdAgent(agent.id, null, locale);
   } catch (e) {
     if (e instanceof RuntimeError && e.code === 'conflict') {
       return NextResponse.json({ error: e.message, code: 'CONFLICT' }, { status: 409 });

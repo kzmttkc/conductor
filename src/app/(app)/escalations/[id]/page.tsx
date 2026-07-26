@@ -7,9 +7,11 @@ import { Loader2 } from 'lucide-react';
 import type { Agent, AgentLog, Escalation } from '@/lib/supabase/types';
 import { EscalationDecision } from '@/components/escalation/EscalationDecision';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/i18n/locale-context';
 
 export default function EscalationDetailPage() {
   const params = useParams<{ id: string }>();
+  const t = useT();
   const [data, setData] = useState<{
     escalation: Escalation;
     agent: Agent;
@@ -22,7 +24,7 @@ export default function EscalationDetailPage() {
     const load = async () => {
       const res = await fetch(`/api/escalations/${params.id}`);
       if (!res.ok) {
-        if (!cancelled) setError('Decision not found');
+        if (!cancelled) setError(t('decision.notFound'));
         return;
       }
       const json = await res.json();
@@ -32,20 +34,18 @@ export default function EscalationDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params.id, t]);
 
   if (error) {
     return (
       <div className="max-w-md space-y-4 py-12">
-        <p className="text-muted-foreground">
-          This decision may have been resolved or no longer exists.
-        </p>
+        <p className="text-muted-foreground">{t('decision.notFoundBody')}</p>
         <div className="flex flex-wrap gap-2">
           <Button asChild>
-            <Link href="/escalations">View all Needs You</Link>
+            <Link href="/escalations">{t('decision.viewAll')}</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/dashboard">Back to dashboard</Link>
+            <Link href="/dashboard">{t('decision.backDash')}</Link>
           </Button>
         </div>
       </div>
@@ -56,7 +56,7 @@ export default function EscalationDetailPage() {
     return (
       <div className="flex items-center text-muted-foreground py-20">
         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        Loading decision…
+        {t('decision.loading')}
       </div>
     );
   }

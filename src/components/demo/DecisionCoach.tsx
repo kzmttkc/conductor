@@ -1,32 +1,56 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useT } from '@/i18n/locale-context';
 
-/** One-line coach on the Needs You decision screen for public demo visitors. */
+const KEY = 'conductor-decision-coach-seen';
+
+/** Coach on Needs You — public demo params OR first-time local visitors. */
 export function DecisionCoach() {
   const params = useSearchParams();
-  const active =
+  const t = useT();
+  const fromTour =
     params.get('tour') === '1' || params.get('src') === 'public-demo';
-  const [dismissed, setDismissed] = useState(false);
+  const [show, setShow] = useState(false);
 
-  if (!active || dismissed) return null;
+  useEffect(() => {
+    if (fromTour) {
+      setShow(true);
+      return;
+    }
+    try {
+      if (!localStorage.getItem(KEY)) setShow(true);
+    } catch {
+      setShow(true);
+    }
+  }, [fromTour]);
+
+  if (!show) return null;
+
+  function dismiss() {
+    setShow(false);
+    try {
+      localStorage.setItem(KEY, '1');
+    } catch {
+      // ignore
+    }
+  }
 
   return (
-    <div className="rounded-xl border border-white/20 bg-black/30 text-white p-4 flex gap-3 items-start">
+    <div className="rounded-xl border border-border bg-card p-4 flex gap-3 items-start">
       <div className="flex-1 min-w-0 space-y-1">
-        <p className="text-sm font-medium">Demo tip</p>
-        <p className="text-sm text-white/75 leading-relaxed">
-          Pick an option (or press <kbd className="px-1 border border-white/30 rounded">A</kbd>{' '}
-          to approve). That&apos;s the core of Conductor — you decide, the agent resumes.
+        <p className="text-sm font-medium">{t('needsYou.coachTitle')}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t('needsYou.coachBody')}
         </p>
       </div>
       <button
         type="button"
-        className="text-white/60 hover:text-white"
-        aria-label="Dismiss tip"
-        onClick={() => setDismissed(true)}
+        className="text-muted-foreground hover:text-foreground"
+        aria-label="Dismiss"
+        onClick={dismiss}
       >
         <X className="h-4 w-4" />
       </button>

@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
   Bot,
@@ -17,24 +17,25 @@ import {
 import { cn } from '@/lib/utils';
 import { BrandMark } from '@/components/brand';
 import { MoreMenu } from '@/components/layout/MoreMenu';
+import { useT } from '@/i18n/locale-context';
 
 const mainNav: {
   href: string;
-  label: string;
-  short: string;
+  labelKey: string;
+  shortKey: string;
   icon: typeof LayoutDashboard;
   badge?: boolean;
 }[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, short: 'Home' },
-  { href: '/agents', label: 'Agents', icon: Bot, short: 'Agents' },
+  { href: '/dashboard', labelKey: 'nav.dashboard', shortKey: 'nav.home', icon: LayoutDashboard },
+  { href: '/agents', labelKey: 'nav.agents', shortKey: 'nav.agents', icon: Bot },
   {
     href: '/escalations',
-    label: 'Needs You',
+    labelKey: 'nav.needsYou',
+    shortKey: 'nav.needsYouShort',
     icon: AlertTriangle,
-    short: 'Needs',
     badge: true,
   },
-  { href: '/results', label: 'Results', icon: FileText, short: 'Results' },
+  { href: '/results', labelKey: 'nav.results', shortKey: 'nav.results', icon: FileText },
 ];
 
 function NavTooltip({ label }: { label: string }) {
@@ -56,10 +57,21 @@ export function CommandNav({
   pendingEscalations = 0,
   moreSlot,
   hideMobile = false,
-  userName = 'Commander',
+  userName = 'You',
 }: Props) {
   const pathname = usePathname();
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const t = useT();
+
+  const navItems = useMemo(
+    () =>
+      mainNav.map((item) => ({
+        ...item,
+        label: t(item.labelKey),
+        short: t(item.shortKey),
+      })),
+    [t]
+  );
 
   useEffect(() => {
     setMobileMoreOpen(false);
@@ -72,13 +84,13 @@ export function CommandNav({
           href="/dashboard"
           className="mb-5 flex h-9 w-9 items-center justify-center rounded-lg overflow-hidden"
           title="Conductor"
-          aria-label="Conductor home"
+          aria-label={t('a11y.home')}
         >
           <BrandMark onBlack className="h-9 w-9" />
         </Link>
 
-        <nav className="flex flex-1 flex-col items-center gap-1" aria-label="Main">
-          {mainNav.map((item) => {
+        <nav className="flex flex-1 flex-col items-center gap-1" aria-label={t('a11y.main')}>
+          {navItems.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
@@ -125,7 +137,7 @@ export function CommandNav({
             <button
               type="button"
               className="fixed inset-0 z-40 bg-black/20"
-              aria-label="Close menu"
+              aria-label={t('a11y.closeMenu')}
               onClick={() => setMobileMoreOpen(false)}
             />
           )}
@@ -136,11 +148,12 @@ export function CommandNav({
             placement="up"
           />
           <div className="relative z-50 flex h-14 items-stretch justify-around px-0.5">
-            {mainNav.map((item) => {
+            {navItems.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
               const showBadge = Boolean(item.badge && pendingEscalations > 0);
+              const mobileShort = item.short;
               return (
                 <Link
                   key={item.href}
@@ -152,7 +165,7 @@ export function CommandNav({
                   )}
                 >
                   <Icon className="h-5 w-5" strokeWidth={1.75} />
-                  <span>{item.short}</span>
+                  <span>{mobileShort}</span>
                   {showBadge && (
                     <span className="absolute right-[18%] top-1.5 h-1.5 w-1.5 rounded-full bg-urgent" />
                   )}
@@ -162,7 +175,7 @@ export function CommandNav({
             <button
               type="button"
               aria-expanded={mobileMoreOpen}
-              aria-label="More"
+              aria-label={t('nav.more')}
               onClick={() => setMobileMoreOpen((v) => !v)}
               className={cn(
                 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors duration-150',
@@ -175,7 +188,7 @@ export function CommandNav({
               )}
             >
               <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
-              <span>More</span>
+              <span>{t('nav.more')}</span>
             </button>
           </div>
         </nav>

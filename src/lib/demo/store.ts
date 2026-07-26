@@ -27,12 +27,14 @@ import {
 } from '@/lib/runtime/pipeline';
 import { sanitizeMarkdown, clipText } from '@/lib/security/validate';
 import { getBundledTemplate, listBundledTemplates } from '@/lib/templates/catalog';
+import { agentLabel, localizeAgentDefinition } from '@/lib/templates/ja-overlays';
+import { rt } from '@/lib/runtime/locale';
 
 /** @deprecated Prefer visitorFromSession — kept for scripts/fixtures */
 export const DEMO_USER = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'commander@conductor.local',
-  name: 'Commander',
+  name: 'You',
 };
 
 type StoreEvent =
@@ -276,20 +278,38 @@ export class DemoStore extends EventEmitter {
     if (action === 'cancel') {
       this.updateAgent(escalation.agent_id, {
         status: 'idle',
-        current_task: 'Stopped by commander',
+        current_task: 'Stopped by user',
       });
-      this.addLog(escalation.agent_id, 'action', `Cancelled by human: ${humanResponse}`);
+      this.addLog(escalation.agent_id, 'action', `Cancelled by human: ${humanResponse}`, {
+        i18nKey: 'log.cancelledByHuman',
+        i18nParams: { response: humanResponse },
+      });
     } else {
       // Permission grants from approval language
-      if (/allow web_search|allow browser|allow file_write/i.test(humanResponse)) {
+      if (
+        /allow\s+web_search|web_search\s*を許可|この実行で\s*web_search/i.test(
+          humanResponse
+        ) ||
+        /allow\s+browser|browser\s*を許可|この実行で\s*browser/i.test(humanResponse) ||
+        /allow\s+file_write|file_write\s*を許可|この実行で\s*file_write/i.test(
+          humanResponse
+        )
+      ) {
         const agent = this.getAgent(escalation.agent_id);
         if (agent) {
           const permissions = { ...agent.permissions };
           for (const tool of ['web_search', 'browser', 'file_write'] as ToolName[]) {
-            if (new RegExp(`allow ${tool}`, 'i').test(humanResponse)) {
+            if (
+              new RegExp(`allow\\s+${tool}`, 'i').test(humanResponse) ||
+              new RegExp(`${tool}\\s*を許可`, 'i').test(humanResponse) ||
+              new RegExp(`この実行で\\s*${tool}`, 'i').test(humanResponse)
+            ) {
               permissions[tool] = 'allow';
             }
-            if (new RegExp(`deny ${tool}`, 'i').test(humanResponse)) {
+            if (
+              new RegExp(`deny\\s+${tool}`, 'i').test(humanResponse) ||
+              new RegExp(`${tool}\\s*を拒否`, 'i').test(humanResponse)
+            ) {
               permissions[tool] = 'deny';
             }
           }
@@ -300,7 +320,11 @@ export class DemoStore extends EventEmitter {
       this.addLog(
         escalation.agent_id,
         'action',
-        `Human ${action === 'approve' ? 'approved' : 'revised'}: ${humanResponse}`
+        `Human ${action === 'approve' ? 'approved' : 'revised'}: ${humanResponse}`,
+        {
+          i18nKey: action === 'approve' ? 'log.humanApproved' : 'log.humanRevised',
+          i18nParams: { response: humanResponse },
+        }
       );
       // Caller should await resumeAgent (serverless-safe).
     }
@@ -354,40 +378,65 @@ export class DemoStore extends EventEmitter {
     return this.templates.find((t) => t.id === id) ?? null;
   }
 
-  launchTemplate(userId: string, templateId: string, theme: string) {
+  launchTemplate(
+    userId: string,
+    templateId: string,
+    theme: string,
+    locale: 'en' | 'ja' = 'en',
+    preferJaSources = false,
+    preferStructuredJa = false
+  ) {
     const template = this.getTemplate(templateId);
     if (!template) throw new Error('Template not found');
 
-    return template.agent_definitions.map((def) =>
-      this.createAgent({
+    return template.agent_definitions.map((raw) => {
+      const def = localizeAgentDefinition(raw, locale);
+      return this.createAgent({
         user_id: userId,
         name: def.name,
         role: def.role,
-        current_task: `${def.goal} — Theme: ${theme}`,
+        current_task: rt(locale, 'log.goalTheme', { goal: def.goal, theme }),
         permissions: def.permissions,
         config: {
           goal: def.goal,
           system_prompt: def.system_prompt,
           escalation_conditions: def.escalation_conditions,
           theme,
+          locale,
+          prefer_ja_sources: preferJaSources,
+          prefer_structured_ja: preferStructuredJa,
         },
         template_id: template.id,
         status: 'idle',
-      })
-    );
+      });
+    });
   }
 
-  async launchTemplateAndRun(userId: string, templateId: string, theme: string) {
-    const created = this.launchTemplate(userId, templateId, theme);
+  async launchTemplateAndRun(
+    userId: string,
+    templateId: string,
+    theme: string,
+    locale: 'en' | 'ja' = 'en',
+    preferJaSources = false,
+    preferStructuredJa = false
+  ) {
+    const created = this.launchTemplate(
+      userId,
+      templateId,
+      theme,
+      locale,
+      preferJaSources,
+      preferStructuredJa
+    );
     const meta = getBundledTemplate(templateId);
     const pipeline = Boolean(meta?.pipeline && created.length > 1);
     for (const patch of attachPipelineConfig(created, pipeline)) {
-      this.updateAgent(patch.id, { config: patch.config });
+      this.updateAgent(patch.id, { config: { ...patch.config, locale } });
     }
     if (pipeline) {
-      await this.startRuntime(created[0].id);
+      await this.startRuntime(created[0].id, null, locale);
     } else {
-      await Promise.all(created.map((agent) => this.startRuntime(agent.id)));
+      await Promise.all(created.map((agent) => this.startRuntime(agent.id, null, locale)));
     }
     return created.map((a) => this.getAgent(a.id)!);
   }
@@ -415,6 +464,7 @@ export class DemoStore extends EventEmitter {
           kind: 'report',
         });
         this.addLog(completedId, 'result', 'Pipeline summary artifact saved', {
+          i18nKey: 'log.pipelineSummarySaved',
           type: 'handoff',
           pipeline_id: agent.config.pipeline_id,
         });
@@ -436,6 +486,8 @@ export class DemoStore extends EventEmitter {
         type: 'handoff',
         reason: gate.reason,
         pipeline_id: agent.config.pipeline_id,
+        i18nKey: 'log.pipelineGated',
+        i18nParams: { detail: gate.detail },
       });
       slog('pipeline.handoff', {
         from: completedId,
@@ -458,17 +510,31 @@ export class DemoStore extends EventEmitter {
       pipelineIds,
       index
     );
+    const nextLocale =
+      agent.config.locale === 'ja' || agent.config.locale === 'en'
+        ? agent.config.locale
+        : undefined;
     this.updateAgent(nextId, {
       config: {
         ...next.config,
         upstream_reports: upstream,
+        ...(nextLocale ? { locale: nextLocale } : {}),
       },
       current_task: `Continuing pipeline after ${agent.name}`,
     });
+    const handoffLocale =
+      agent.config.locale === 'ja' || agent.config.locale === 'en'
+        ? agent.config.locale
+        : 'en';
     this.addLog(nextId, 'action', `Handoff from ${agent.name} (${upstream.length} chars upstream)`, {
       type: 'handoff',
       from: completedId,
       pipeline_id: agent.config.pipeline_id,
+      i18nKey: 'log.handoffFromChars',
+      i18nParams: {
+        name: agentLabel(agent.name, handoffLocale),
+        n: upstream.length,
+      },
     });
     slog('pipeline.handoff', {
       from: completedId,
@@ -477,7 +543,7 @@ export class DemoStore extends EventEmitter {
       upstreamChars: upstream.length,
       pipelineId: agent.config.pipeline_id,
     });
-    await this.startRuntime(nextId);
+    await this.startRuntime(nextId, null, nextLocale);
   }
 
   private makeSink(agentId: string) {
@@ -538,9 +604,12 @@ export class DemoStore extends EventEmitter {
     releaseAgentLock(agentId);
     this.updateAgent(agentId, {
       status: 'idle',
-      current_task: 'Stopped by commander',
+      current_task: 'Stopped by user',
     });
-    this.addLog(agentId, 'error', 'Stopped by commander', { code: 'cancelled' });
+    this.addLog(agentId, 'error', 'Stopped by user', {
+      code: 'cancelled',
+      i18nKey: 'log.stoppedByUser',
+    });
     slog('agent.error', { agentId, code: 'cancelled' });
   }
 
@@ -556,9 +625,18 @@ export class DemoStore extends EventEmitter {
       slog('plan.limit_hit', { userId, plan, metric: 'agentRuns', value: this.usage.agentRuns });
       const err = new Error(
         `Plan limit: ${limits.label} hard cap (~${hardRuns} runs) reached.`
-      ) as Error & { code: string; upgrade_to: string };
+      ) as Error & {
+        code: string;
+        upgrade_to: string;
+        plan: string;
+        n: number;
+        metric: string;
+      };
       err.code = 'USAGE_LIMIT';
       err.upgrade_to = upgrade_to;
+      err.plan = plan;
+      err.n = hardRuns;
+      err.metric = 'agentRuns';
       throw err;
     }
     if (this.usage.tokensApprox >= hardTokens) {
@@ -570,9 +648,18 @@ export class DemoStore extends EventEmitter {
       });
       const err = new Error(
         `Plan limit: ${limits.label} hard token cap (~${hardTokens}) reached.`
-      ) as Error & { code: string; upgrade_to: string };
+      ) as Error & {
+        code: string;
+        upgrade_to: string;
+        plan: string;
+        n: number;
+        metric: string;
+      };
       err.code = 'USAGE_LIMIT';
       err.upgrade_to = upgrade_to;
+      err.plan = plan;
+      err.n = hardTokens;
+      err.metric = 'tokensApprox';
       throw err;
     }
     if (this.usage.agentRuns >= limits.maxAgentRuns) {
@@ -588,9 +675,20 @@ export class DemoStore extends EventEmitter {
     }
   }
 
-  async startRuntime(agentId: string, humanGuidance?: string | null) {
+  async startRuntime(
+    agentId: string,
+    humanGuidance?: string | null,
+    locale?: 'en' | 'ja'
+  ) {
     let agent = this.getAgent(agentId);
     if (!agent) return;
+
+    if (locale) {
+      agent =
+        this.updateAgent(agentId, {
+          config: { ...agent.config, locale },
+        }) ?? agent;
+    }
 
     if (
       agent.status === 'running' ||
@@ -606,11 +704,20 @@ export class DemoStore extends EventEmitter {
     // Cookie slim may drop system_prompt — restore from bundled template
     if (!agent.config.system_prompt && agent.template_id) {
       const tmpl = getBundledTemplate(agent.template_id);
-      const def = tmpl?.agent_definitions.find((d) => d.name === agent!.name);
-      if (def?.system_prompt) {
+      const raw = tmpl?.agent_definitions.find((d) => d.name === agent!.name);
+      if (raw?.system_prompt) {
+        const loc =
+          agent.config.locale === 'ja' || agent.config.locale === 'en'
+            ? agent.config.locale
+            : 'en';
+        const def = localizeAgentDefinition(raw, loc);
         agent =
           this.updateAgent(agentId, {
-            config: { ...agent.config, system_prompt: def.system_prompt, goal: def.goal },
+            config: {
+              ...agent.config,
+              system_prompt: def.system_prompt,
+              goal: def.goal,
+            },
           }) ?? agent;
       }
     }
@@ -650,7 +757,16 @@ export class DemoStore extends EventEmitter {
 
     this.running.add(agentId);
     try {
-      await executeAgentPass(agent, this.makeSink(agentId), { humanGuidance });
+      const passLocale =
+        locale === 'ja' || locale === 'en'
+          ? locale
+          : agent.config.locale === 'ja' || agent.config.locale === 'en'
+            ? agent.config.locale
+            : undefined;
+      await executeAgentPass(agent, this.makeSink(agentId), {
+        humanGuidance,
+        locale: passLocale,
+      });
       const after = this.getAgent(agentId);
       if (after?.status === 'completed') {
         await this.continuePipeline(agentId);
@@ -667,23 +783,37 @@ export class DemoStore extends EventEmitter {
     }
   }
 
-  async resumeAgent(agentId: string, humanResponse: string) {
+  async resumeAgent(agentId: string, humanResponse: string, locale?: 'en' | 'ja') {
     slog('agent.resume', { agentId });
-    await this.startRuntime(agentId, humanResponse);
+    await this.startRuntime(agentId, humanResponse, locale);
   }
 
-  async recoverAgent(agentId: string, opts?: { allowWebSearch?: boolean }) {
+  async recoverAgent(
+    agentId: string,
+    opts?: { allowWebSearch?: boolean; locale?: 'en' | 'ja' }
+  ) {
     if (opts?.allowWebSearch) {
       const agent = this.getAgent(agentId);
       if (agent) {
         this.updateAgent(agentId, {
           permissions: { ...agent.permissions, web_search: 'allow' },
         });
-        this.addLog(agentId, 'action', 'Commander loosened web_search → Allow for retry');
+        this.addLog(agentId, 'action', 'web_search loosened → Allow for retry', {
+          i18nKey: 'log.searchAllowedRetry',
+        });
       }
     }
-    this.addLog(agentId, 'action', 'Commander requested recovery / retry');
-    await this.startRuntime(agentId, 'Retry after error. Prefer safe sources.');
+    this.addLog(agentId, 'action', 'Recovery / retry requested', {
+      i18nKey: 'log.recoveryRequested',
+    });
+    const agent = this.getAgent(agentId);
+    const locale =
+      opts?.locale ??
+      (agent?.config.locale === 'ja' || agent?.config.locale === 'en'
+        ? agent.config.locale
+        : 'en');
+    const { rt } = await import('@/lib/runtime/locale');
+    await this.startRuntime(agentId, rt(locale, 'llm.recoverGuidance'), locale);
   }
 
   markOnboarded(userId: string) {

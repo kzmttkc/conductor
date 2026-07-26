@@ -1,50 +1,53 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/i18n/locale-context';
 
-const concepts = [
+const conceptKeys = [
   {
-    title: 'Agents',
-    body: 'Each agent has a role — researcher, writer, editor, and so on. They run tasks, log progress, and pause when they need your input.',
+    titleKey: 'help.agentsTitle',
+    bodyKey: 'help.agentsBody',
   },
   {
-    title: 'Templates',
-    body: 'Pre-built crews you can launch in one click. Free includes Solo Scout or Content Pipeline; upgrade for larger teams like Research Crew.',
+    titleKey: 'help.templatesTitle',
+    bodyKey: 'help.templatesBody',
   },
   {
-    title: 'Needs You',
-    body: 'When an agent hits a judgment call, it escalates to you. Review the context, approve or redirect, and the crew keeps moving.',
+    titleKey: 'help.needsTitle',
+    bodyKey: 'help.needsBody',
   },
   {
-    title: 'Results',
-    body: 'Finished work lands in Results — reports, drafts, and other deliverables your crew produced during the run.',
+    titleKey: 'help.resultsTitle',
+    bodyKey: 'help.resultsBody',
   },
-];
+] as const;
 
 export default function HelpPage() {
+  const t = useT();
+
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="font-display text-4xl tracking-tight">Help</h1>
-        <p className="text-muted-foreground mt-2 leading-relaxed">
-          Four ideas that explain how Conductor works.
-        </p>
+        <h1 className="font-display text-4xl tracking-tight">{t('help.title')}</h1>
+        <p className="text-muted-foreground mt-2 leading-relaxed">{t('help.intro')}</p>
       </div>
 
       <div className="space-y-6">
-        {concepts.map((item) => (
-          <section key={item.title} className="surface rounded-xl p-5 space-y-2">
-            <h2 className="font-medium">{item.title}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">{item.body}</p>
+        {conceptKeys.map((item) => (
+          <section key={item.titleKey} className="surface rounded-xl p-5 space-y-2">
+            <h2 className="font-medium">{t(item.titleKey)}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">{t(item.bodyKey)}</p>
           </section>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-3">
         <Button asChild>
-          <Link href="/templates">Browse templates</Link>
+          <Link href="/templates">{t('help.browseTemplates')}</Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/dashboard">Go to dashboard</Link>
+          <Link href="/dashboard">{t('help.goDashboard')}</Link>
         </Button>
       </div>
     </div>

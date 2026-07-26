@@ -8,10 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PLAN_LIMITS, type PlanTier } from '@/lib/supabase/types';
+import type { PlanTier } from '@/lib/supabase/types';
+import { useT } from '@/i18n/locale-context';
+import { formatApiError } from '@/i18n/format-content';
 
 export default function NewAgentPage() {
   const router = useRouter();
+  const t = useT();
   const [loading, setLoading] = useState(false);
   const [limitError, setLimitError] = useState<{
     message: string;
@@ -19,10 +22,15 @@ export default function NewAgentPage() {
   } | null>(null);
   const [form, setForm] = useState({
     name: '',
+    displayNameJa: '',
     role: '',
     goal: '',
     start: true,
   });
+
+  function planName(p: PlanTier) {
+    return t(`plan.${p}`);
+  }
 
   async function upgrade(to: PlanTier) {
     const res = await fetch('/api/plan', {
@@ -31,11 +39,11 @@ export default function NewAgentPage() {
       body: JSON.stringify({ plan: to }),
     });
     if (!res.ok) {
-      toast.error('Upgrade failed');
+      toast.error(t('agentsNew.upgradeFailed'));
       return;
     }
     setLimitError(null);
-    toast.success(`Upgraded to ${PLAN_LIMITS[to].label}`);
+    toast.success(t('agentsNew.upgraded', { plan: planName(to) }));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -50,7 +58,13 @@ export default function NewAgentPage() {
           name: form.name,
           role: form.role,
           current_task: form.goal,
-          config: { goal: form.goal, theme: form.goal },
+          config: {
+            goal: form.goal,
+            theme: form.goal,
+            ...(form.displayNameJa.trim()
+              ? { display_name_ja: form.displayNameJa.trim() }
+              : {}),
+          },
           permissions: {
             web_search: 'allow',
             browser: 'require_approval',
@@ -61,16 +75,23 @@ export default function NewAgentPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.code === 'PLAN_LIMIT') {
-          setLimitError({ message: data.error, upgrade_to: data.upgrade_to });
+        if (data.code === 'PLAN_LIMIT' || data.code === 'USAGE_LIMIT') {
+          setLimitError({
+            message: formatApiError(data, t),
+            upgrade_to: data.upgrade_to,
+          });
           return;
         }
-        throw new Error(data.error || 'Failed');
+        throw new Error(formatApiError(data, t) || t('agentsNew.failed'));
       }
-      toast.success(`${form.name} created`);
+      toast.success(
+        t('agentsNew.created', {
+          name: form.displayNameJa.trim() || form.name,
+        })
+      );
       router.push(`/agents/${data.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed');
+      toast.error(err instanceof Error ? err.message : t('agentsNew.failed'));
     } finally {
       setLoading(false);
     }
@@ -79,10 +100,8 @@ export default function NewAgentPage() {
   return (
     <div className="max-w-xl space-y-6">
       <div>
-        <h1 className="font-display text-4xl tracking-tight">New agent</h1>
-        <p className="text-muted-foreground mt-2">
-          Define a clear role, goal, and starting posture.
-        </p>
+        <h1 className="font-display text-4xl tracking-tight">{t('agentsNew.title')}</h1>
+        <p className="text-muted-foreground mt-2">{t('agentsNew.subtitle')}</p>
       </div>
 
       {limitError && (
@@ -91,10 +110,10 @@ export default function NewAgentPage() {
           {limitError.upgrade_to && (
             <div className="flex gap-2">
               <Button size="sm" onClick={() => upgrade(limitError.upgrade_to!)}>
-                Upgrade to {PLAN_LIMITS[limitError.upgrade_to].label}
+                {t('agentsNew.upgradeTo', { plan: planName(limitError.upgrade_to) })}
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link href="/settings">Plans</Link>
+                <Link href="/settings">{t('agentsNew.plans')}</Link>
               </Button>
             </div>
           )}
@@ -103,32 +122,47 @@ export default function NewAgentPage() {
 
       <form onSubmit={onSubmit} className="surface rounded-2xl p-6 space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Name</Label>
+          <Label htmlFor="name">{t('agentsNew.name')}</Label>
           <Input
             id="name"
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Scout"
+            placeholder={t('agentsNew.namePh')}
             required
           />
+          <p className="text-xs text-muted-foreground">{t('agentsNew.nameHint')}</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="role">Role</Label>
+          <Label htmlFor="displayNameJa">{t('agentsNew.displayNameJa')}</Label>
+          <Input
+            id="displayNameJa"
+            value={form.displayNameJa}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, displayNameJa: e.target.value }))
+            }
+            placeholder={t('agentsNew.displayNameJaPh')}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t('agentsNew.displayNameJaHint')}
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="role">{t('agentsNew.role')}</Label>
           <Input
             id="role"
             value={form.role}
             onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-            placeholder="Researcher"
+            placeholder={t('agentsNew.rolePh')}
             required
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="goal">Goal / current task</Label>
+          <Label htmlFor="goal">{t('agentsNew.goal')}</Label>
           <Textarea
             id="goal"
             value={form.goal}
             onChange={(e) => setForm((f) => ({ ...f, goal: e.target.value }))}
-            placeholder="Collect primary sources on…"
+            placeholder={t('agentsNew.goalPh')}
             required
           />
         </div>
@@ -138,10 +172,10 @@ export default function NewAgentPage() {
             checked={form.start}
             onChange={(e) => setForm((f) => ({ ...f, start: e.target.checked }))}
           />
-          Start immediately
+          {t('agentsNew.startNow')}
         </label>
         <Button type="submit" disabled={loading} className="w-full">
-          {loading ? 'Creating…' : 'Create agent'}
+          {loading ? t('agentsNew.creating') : t('agentsNew.create')}
         </Button>
       </form>
     </div>

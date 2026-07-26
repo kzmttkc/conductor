@@ -9,23 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShareButtons } from '@/components/marketing/ShareButtons';
+import { useT } from '@/i18n/locale-context';
 
 const DEMO_THEME_KEY = 'conductor-demo-theme';
 const DEFAULT_THEME = 'Electric vehicle market trends 2026';
 
-function friendlyDemoError(message: string): string {
-  if (
-    message.includes('NEXT_PUBLIC') ||
-    message.includes('Demo Mode') ||
-    message.includes('not available')
-  ) {
-    return 'The live demo is not available right now. Try signing in instead.';
-  }
-  return message;
-}
-
 export default function PublicDemoPage() {
   const router = useRouter();
+  const t = useT();
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_THEME;
     try {
@@ -44,6 +35,17 @@ export default function PublicDemoPage() {
     }
   }, [theme]);
 
+  function friendlyDemoError(message: string): string {
+    if (
+      message.includes('NEXT_PUBLIC') ||
+      message.includes('Demo Mode') ||
+      message.includes('not available')
+    ) {
+      return t('demo.unavailable');
+    }
+    return message;
+  }
+
   async function start() {
     setLoading(true);
     try {
@@ -56,7 +58,7 @@ export default function PublicDemoPage() {
       if (!res.ok) {
         throw new Error(friendlyDemoError(data.error || 'Could not start demo'));
       }
-      toast.success('Demo launched — watch for Needs You');
+      toast.success(t('templates.launched'));
       router.push(data.next || '/dashboard?tour=1&src=public-demo');
       router.refresh();
     } catch (err) {
@@ -70,7 +72,7 @@ export default function PublicDemoPage() {
   async function copyLink() {
     const url = `${window.location.origin}/demo`;
     await navigator.clipboard.writeText(url);
-    toast.success('Demo link copied');
+    toast.success(t('demo.copyLink'));
   }
 
   return (
@@ -78,17 +80,13 @@ export default function PublicDemoPage() {
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,#f4f6f3_0%,#e7eee8_50%,#dfe8e3_100%)]" />
       <div className="mx-auto max-w-xl px-5 sm:px-6 py-12 sm:py-16 md:py-20">
         <h1 className="font-display text-4xl md:text-5xl tracking-tight leading-tight text-balance">
-          Try the command tower
+          {t('demo.title')}
         </h1>
-        <p className="text-[#6b6b66] mt-4 leading-relaxed">
-          No signup. One click launches Solo Scout, then a real{' '}
-          <span className="text-[#d64545] font-medium">Needs You</span> escalation
-          appears so you can feel the core loop in under a minute.
-        </p>
+        <p className="text-[#6b6b66] mt-4 leading-relaxed">{t('demo.body')}</p>
 
         <div className="rounded-2xl border border-[#e4e4e0] bg-white/80 p-5 sm:p-6 mt-8 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="theme">What should they research?</Label>
+            <Label htmlFor="theme">{t('demo.themeLabel')}</Label>
             <Input
               id="theme"
               value={theme}
@@ -106,12 +104,12 @@ export default function PublicDemoPage() {
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Starting demo…
+                {t('demo.starting')}
               </>
             ) : (
               <>
                 <Play className="h-4 w-4" />
-                Start public demo
+                {t('demo.start')}
               </>
             )}
           </Button>
@@ -122,22 +120,18 @@ export default function PublicDemoPage() {
             type="button"
           >
             <Share2 className="h-4 w-4" />
-            Copy /demo link
+            {t('demo.copyLink')}
           </Button>
         </div>
 
         <div className="mt-6">
-          <ShareButtons
-            tone="light"
-            path="/demo"
-            text="One-click Conductor demo — launch Scout, hit Needs You, decide in 3 seconds:"
-          />
+          <ShareButtons tone="light" path="/demo" text={t('share.demoCaption')} />
         </div>
 
         <p className="text-xs text-[#6b6b66] mt-6 leading-relaxed">
-          Prefer a static share preview of the escalation moment?{' '}
+          {t('demo.momentLink')}{' '}
           <Link href="/demo/moment" className="underline underline-offset-2">
-            Open Needs You moment
+            {t('demo.openMoment')}
           </Link>
           .
         </p>

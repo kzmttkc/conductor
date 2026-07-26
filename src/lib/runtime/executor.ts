@@ -7,6 +7,24 @@ import {
 } from '@/lib/runtime/permission-guard';
 import { RuntimeError, classifyError, shortTaskForError } from '@/lib/runtime/errors';
 import { slog } from '@/lib/runtime/observability';
+import type { Locale } from '@/i18n/types';
+import { resolveAgentLocale, rt } from '@/lib/runtime/locale';
+import {
+  clipUpstreamFindings,
+  findingsNeedSourceNote,
+  formatSearchFinding,
+} from '@/lib/runtime/locale-text';
+import {
+  agentLabel,
+  displayNameJaFromConfig,
+  roleLabel,
+} from '@/lib/templates/ja-overlays';
+
+function labelFor(agent: Agent, locale: Locale) {
+  return agentLabel(agent.name, locale, {
+    displayNameJa: displayNameJaFromConfig(agent.config),
+  });
+}
 
 export const AGENT_PASS_TIMEOUT_MS = 110_000;
 
@@ -50,13 +68,29 @@ async function runToolWithPermission(
     sink.escalate(
       `Agent requests approval to use “${tool.replaceAll('_', ' ')}”. Allow this tool call?`,
       approvalOptionsForTool(tool),
-      { tool, reason: 'require_approval', code: 'require_approval' }
+      {
+        tool,
+        reason: 'require_approval',
+        code: 'require_approval',
+        summaryKey: 'escalate.summaryTool',
+        summaryParams: { tool: tool.replaceAll('_', ' ') },
+        locale: resolveAgentLocale(agent),
+        optionKeys: [
+          'escalate.optionAllowTool',
+          'escalate.optionDenyTool',
+          'escalate.optionAbort',
+        ],
+      }
     );
     slog('agent.escalate', { agentId: agent.id, tool, reason: 'require_approval' });
     return 'escalated';
   }
 
-  sink.log('tool_call', `Calling ${tool}`, { tool });
+  sink.log('tool_call', `Calling ${tool}`, {
+    tool,
+    i18nKey: 'log.callingTool',
+    i18nParams: { tool },
+  });
   slog('agent.tool_call', { agentId: agent.id, tool, result: 'allow' });
   sink.trackUsage({ toolCalls: 1 });
   try {
@@ -70,16 +104,23 @@ async function runToolWithPermission(
   }
 }
 
-function upstreamBlock(agent: Agent) {
+function upstreamBlock(agent: Agent, locale: Locale) {
   const upstream = String(agent.config.upstream_reports ?? '').trim();
   return upstream
-    ? `\n## Upstream report:\n${upstream.slice(0, 6000)}\n`
+    ? `\n## ${rt(locale, 'report.upstreamReport')}:\n${upstream.slice(0, 6000)}\n`
     : '';
 }
 
-function buildReport(agent: Agent, findings: string[], guidance?: string | null) {
+function buildReport(
+  agent: Agent,
+  findings: string[],
+  guidance: string | null | undefined,
+  locale: Locale
+) {
   const theme = String(agent.config.theme ?? agent.current_task ?? 'Mission');
-  const mode = hasLlmKey() ? 'LLM' : 'Structured runtime';
+  const mode = hasLlmKey()
+    ? rt(locale, 'narrative.modeLlm')
+    : rt(locale, 'narrative.modeStructured');
   const role = agent.role;
   const isVerifier = agent.name === 'Verifier' || role === 'Fact Checker';
   const isEditor = agent.name === 'Editor' || role === 'Editor';
@@ -88,97 +129,114 @@ function buildReport(agent: Agent, findings: string[], guidance?: string | null)
     agent.name === 'BriefWriter' ||
     role === 'Analyst';
 
+  const displayName = labelFor(agent, locale);
+  const displayRole = roleLabel(agent.role, locale);
+
   if (isVerifier) {
     const claims = findings.slice(0, 5);
-    return `# Verification Report — ${theme}
+    const n = claims.length || '—';
+    return `# ${rt(locale, 'report.verificationReport', { theme })}
 
-**Role:** ${agent.role}  
-**Mode:** ${mode}  
-**Generated:** ${new Date().toISOString()}
-${upstreamBlock(agent)}
-## Verification summary
-Checked ${claims.length || 'available'} claims against open sources. Confidence is provisional without primary filings.
-${guidance ? `\n**Human guidance applied:** ${guidance}\n` : ''}
+**${rt(locale, 'report.role')}:** ${displayRole}  
+**${rt(locale, 'report.mode')}:** ${mode}  
+**${rt(locale, 'report.generated')}:** ${new Date().toISOString()}
+${upstreamBlock(agent, locale)}
+## ${rt(locale, 'report.verificationSummary')}
+${rt(locale, 'narrative.checkedClaims', { n })}
+${guidance ? `\n**${rt(locale, 'report.humanGuidanceApplied')}:** ${guidance}\n` : ''}
 
-## Claim checks
+## ${rt(locale, 'report.claimChecks')}
 ${
+  findingsNeedSourceNote(claims, locale)
+    ? `_${rt(locale, 'search.findingsNote')}_\n\n`
+    : ''
+}${
   claims.length
     ? claims
         .map(
           (f, i) =>
-            `### Claim ${i + 1}\n${f}\n\n- **Status:** Partially corroborated (open web)\n- **Risk:** Figures may lag or conflict across vendors`
+            `### ${rt(locale, 'report.claimN', { n: i + 1 })}\n${f}\n\n- **${rt(locale, 'report.status')}:** ${rt(locale, 'report.partiallyCorroborated')}\n- **${rt(locale, 'report.risk')}:** ${rt(locale, 'report.figuresMayLag')}`
         )
         .join('\n\n')
-    : '_No discrete claims extracted; review upstream report manually._'
+    : `_${rt(locale, 'report.noClaims')}_`
 }
 
-## Residual risks
-- Paywalled or primary sources not fully inspected
-- Market sizing methodologies may not be comparable
-- Recommend commander sign-off before budget decisions
+## ${rt(locale, 'report.residualRisks')}
+- ${rt(locale, 'narrative.riskPaywall')}
+- ${rt(locale, 'narrative.riskSizing')}
+- ${rt(locale, 'narrative.riskSignoff')}
 
-## Recommendation
-Proceed with caveats, or request a deeper primary-source pass.
+## ${rt(locale, 'report.recommendation')}
+${rt(locale, 'narrative.proceedCaveats')}
 `;
   }
 
   if (isSynthesizer || isEditor) {
-    return `# ${agent.name} Deliverable — ${theme}
+    return `# ${rt(locale, 'report.deliverable', { name: displayName, theme })}
 
-**Role:** ${agent.role}  
-**Mode:** ${mode}  
-**Generated:** ${new Date().toISOString()}
-${upstreamBlock(agent)}
-## Executive brief
-${guidance ? `**Human guidance:** ${guidance}\n\n` : ''}Structured synthesis of upstream research into a decision-ready brief.
+**${rt(locale, 'report.role')}:** ${displayRole}  
+**${rt(locale, 'report.mode')}:** ${mode}  
+**${rt(locale, 'report.generated')}:** ${new Date().toISOString()}
+${upstreamBlock(agent, locale)}
+## ${rt(locale, 'report.executiveBrief')}
+${guidance ? `**${rt(locale, 'report.humanGuidance')}:** ${guidance}\n\n` : ''}${rt(locale, 'narrative.structuredSynthesis')}
 
-## Key points
-${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n') || '1. Upstream context only — expand with commander priorities.'}
+## ${rt(locale, 'report.keyPoints')}
+${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n') || `1. ${rt(locale, 'narrative.upstreamOnlyExpand')}`}
 
-## Suggested framing
-Lead with competitive pressure, then growth opportunity, unless the commander chose otherwise.
+## ${rt(locale, 'report.suggestedFraming')}
+${rt(locale, 'narrative.leadCompetitive')}
 
-## Next actions
-- Validate top 2 figures with primary sources
-- Assign owners for follow-up research
+## ${rt(locale, 'report.nextActions')}
+- ${rt(locale, 'narrative.nextValidate')}
+- ${rt(locale, 'narrative.nextOwners')}
 `;
   }
 
-  return `# ${agent.name} Report — ${theme}
+  return `# ${rt(locale, 'report.agentReport', { name: displayName, theme })}
 
-**Role:** ${agent.role}  
-**Mode:** ${mode}  
-**Generated:** ${new Date().toISOString()}
-${upstreamBlock(agent)}
-## Executive summary
-${agent.name} completed a research pass on **${theme}**.
-${guidance ? `\n**Human guidance applied:** ${guidance}\n` : ''}
+**${rt(locale, 'report.role')}:** ${displayRole}  
+**${rt(locale, 'report.mode')}:** ${mode}  
+**${rt(locale, 'report.generated')}:** ${new Date().toISOString()}
+${upstreamBlock(agent, locale)}
+## ${rt(locale, 'report.executiveSummary')}
+${rt(locale, 'narrative.completedPass', { name: displayName, theme })}
+${guidance ? `\n**${rt(locale, 'report.humanGuidanceApplied')}:** ${guidance}\n` : ''}
 
-## Findings
-${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n')}
+## ${rt(locale, 'report.findings')}
+${
+  findingsNeedSourceNote(findings, locale)
+    ? `_${rt(locale, 'search.findingsNote')}_\n\n`
+    : ''
+}${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n')}
 
-## Recommended next actions
-- Review conflicting figures before committing budget
-- Validate any paywalled claims with primary filings
-- Hand off to the next crew member if this is a pipeline run
+## ${rt(locale, 'report.recommendedNext')}
+- ${rt(locale, 'narrative.nextConflict')}
+- ${rt(locale, 'narrative.nextPaywall')}
+- ${rt(locale, 'narrative.nextHandoff')}
 
 ---
-_Produced by Conductor agent runtime._
+_${rt(locale, 'report.producedBy')}_
 `;
 }
 
 async function runStructuredPass(
   agent: Agent,
   sink: ExecutorSink,
-  humanGuidance?: string | null
+  humanGuidance: string | null | undefined,
+  locale: Locale
 ) {
   const theme = String(agent.config.theme ?? 'the assigned topic');
   const upstream = String(agent.config.upstream_reports ?? '').trim();
-  sink.log('thought', `Planning work on “${theme}”.`);
+  sink.log('thought', `Planning work on “${theme}”.`, {
+    i18nKey: 'log.planningTheme',
+    i18nParams: { theme },
+  });
   if (upstream) {
     sink.log('action', 'Upstream report: ingesting prior crew deliverable', {
       event: 'pipeline.handoff',
       chars: upstream.length,
+      i18nKey: 'log.upstreamIngest',
     });
     sink.log('result', `Upstream report:\n${upstream.slice(0, 800)}`);
   }
@@ -187,7 +245,10 @@ async function runStructuredPass(
   const findings: string[] = [];
 
   if (humanGuidance) {
-    sink.log('thought', `Applying human guidance: ${humanGuidance}`);
+    sink.log('thought', `Applying human guidance: ${humanGuidance}`, {
+      i18nKey: 'log.applyingGuidance',
+      i18nParams: { guidance: humanGuidance },
+    });
   }
 
   const wantsSearch =
@@ -200,18 +261,21 @@ async function runStructuredPass(
         agent.name === 'Verifier' || agent.role === 'Fact Checker'
           ? `${theme} market size verification sources 2025 2026`
           : `${theme} market size competitors 2025 2026`;
-      const results = await webSearch(query, 5);
+      const results = await webSearch(query, 5, {
+        locale,
+        preferJaSources: Boolean(agent.config.prefer_ja_sources),
+      });
       for (const r of results) {
-        findings.push(`**${r.title}**${r.url ? ` — ${r.url}` : ''}\n${r.snippet}`);
+        findings.push(formatSearchFinding(r, locale));
       }
       return results.map((r) => `${r.title}: ${r.snippet}`).join('\n\n');
     });
     if (searchStatus === 'escalated') return;
     if (searchStatus === 'denied') {
-      findings.push('Web search denied by commander permissions. Working from role knowledge / upstream only.');
+      findings.push(rt(locale, 'report.searchDenied'));
     }
   } else if (upstream) {
-    findings.push('Working primarily from upstream crew reports (search denied or unnecessary).');
+    findings.push(rt(locale, 'report.upstreamOnly'));
   }
 
   await sleep(500);
@@ -256,6 +320,15 @@ async function runStructuredPass(
     ) {
       // fall through to report
     } else {
+      const summaryKey =
+        agent.name === 'Verifier' || agent.role === 'Fact Checker'
+          ? 'escalate.summaryVerify'
+          : agent.role === 'Analyst' ||
+              agent.name === 'BriefWriter' ||
+              agent.name === 'Synthesizer' ||
+              agent.name === 'Editor'
+            ? 'escalate.summaryPriority'
+            : 'escalate.summaryConflict';
       sink.escalate(
         summary,
         [
@@ -268,6 +341,14 @@ async function runStructuredPass(
           findings: findings.slice(0, 3).map((f) => f.replace(/[\u0000-\u001f]+/g, ' ').slice(0, 400)),
           conditions,
           has_upstream: Boolean(upstream),
+          locale,
+          summaryKey,
+          summaryParams: { theme },
+          optionKeys: [
+            'escalate.optionApproveContinue',
+            'escalate.optionNarrowCompetitors',
+            'escalate.optionPauseDeeper',
+          ],
         }
       );
       slog('agent.escalate', { agentId: agent.id, source: 'structured', theme });
@@ -276,32 +357,50 @@ async function runStructuredPass(
   }
 
   sink.setStatus('running', `Writing deliverable for ${theme}`);
-  sink.log('action', `${agent.name} composing final report…`);
+  sink.log('action', `${agent.name} composing final report…`, {
+    i18nKey: 'log.composingReport',
+    i18nParams: { name: labelFor(agent, locale) },
+  });
   await sleep(600);
 
   if (upstream && findings.length < 2) {
-    findings.push(`Integrated upstream context (${Math.min(upstream.length, 6000)} chars).`);
+    findings.push(
+      rt(locale, 'report.integratedUpstream', {
+        n: Math.min(upstream.length, 6000),
+      })
+    );
   }
 
   const report = buildReport(
     agent,
-    findings.length ? findings : ['No external findings captured.'],
-    humanGuidance
+    findings.length ? findings : [rt(locale, 'report.noFindings')],
+    humanGuidance,
+    locale
   );
-  sink.saveReport(`${agent.name}: ${theme}`, report);
-  sink.log('result', 'Report saved.');
+  sink.saveReport(`${labelFor(agent, locale)}: ${theme}`, report);
+  sink.log('result', 'Report saved.', { i18nKey: 'log.reportSaved' });
   sink.setStatus('completed', 'Completed — report ready');
   sink.trackUsage({ agentRuns: 1 });
   slog('agent.complete', { agentId: agent.id, name: agent.name, mode: 'structured' });
 }
 
-async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: string | null) {
+async function runLlmPass(
+  agent: Agent,
+  sink: ExecutorSink,
+  humanGuidance: string | null | undefined,
+  locale: Locale
+) {
   const theme = String(agent.config.theme ?? agent.current_task ?? 'mission');
   const system = String(
     agent.config.system_prompt ||
-      `You are ${agent.name}, a ${agent.role}. Be precise. Escalate when judgment is required.`
+      rt(locale, 'llm.defaultSystem', {
+        name: labelFor(agent, locale),
+        role: roleLabel(agent.role, locale),
+      })
   );
   const allowWeb = sink.getPermission('web_search') === 'allow';
+  const preferJaSources = Boolean(agent.config.prefer_ja_sources);
+  const preferStructuredJa = Boolean(agent.config.prefer_structured_ja);
   const upstream = String(agent.config.upstream_reports ?? '').trim();
 
   if (
@@ -317,35 +416,87 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
     if (status === 'escalated') return;
   }
 
-  sink.log('thought', hasLlmKey() ? 'Invoking LLM agent pass…' : 'LLM unavailable');
+  sink.log(
+    'thought',
+    hasLlmKey() ? 'Invoking LLM agent pass…' : 'LLM unavailable',
+    { i18nKey: hasLlmKey() ? 'log.invokingLlm' : 'log.llmUnavailable' }
+  );
   sink.setStatus('running', `LLM pass: ${theme}`);
 
   try {
     const prompt = [
-      `Mission theme: ${theme}`,
-      `Goal: ${String(agent.config.goal ?? agent.current_task ?? '')}`,
-      humanGuidance ? `Human guidance: ${humanGuidance}` : 'No human guidance yet.',
-      upstream ? `\nUpstream report:\n${upstream.slice(0, 8000)}` : '',
+      rt(locale, 'llm.missionTheme', { theme }),
+      rt(locale, 'llm.goalLine', {
+        goal: String(agent.config.goal ?? agent.current_task ?? ''),
+      }),
+      humanGuidance
+        ? rt(locale, 'llm.humanGuidance', { guidance: humanGuidance })
+        : rt(locale, 'llm.noGuidance'),
+      upstream ? `\n${rt(locale, 'report.upstreamReport')}:\n${upstream.slice(0, 8000)}` : '',
       '',
       agent.name === 'Verifier' || agent.role === 'Fact Checker'
-        ? 'Verify important claims. Call escalate_to_human if a material claim cannot be corroborated.'
-        : 'Do useful research. If sources conflict or judgment is needed, call escalate_to_human.',
-      'Otherwise produce a concise markdown report in your final answer.',
+        ? rt(locale, 'llm.verifyInstruction')
+        : rt(locale, 'llm.researchInstruction'),
+      rt(locale, 'llm.finalMarkdown'),
     ]
       .filter(Boolean)
       .join('\n');
 
-    const { text, escalated, tokensApprox } = await runLlmAgentPass({
+    const {
+      text,
+      escalated,
+      searchFindings,
+      reportNeedsStructuredFallback,
+      rewriteSkipReason,
+      tokensApprox,
+    } = await runLlmAgentPass({
       system,
       prompt,
       allowWebSearch: allowWeb,
+      locale,
+      theme,
+      preferJaSources,
+      preferStructuredJa,
       onEvent: (event) => {
         if (event.type === 'tool_call') {
-          sink.log('tool_call', `LLM tool: ${event.tool}`, { input: event.input });
+          const toolLabel = rt(locale, `tool.${event.tool}`);
+          sink.log('tool_call', `LLM tool: ${event.tool}`, {
+            input: event.input,
+            i18nKey: 'log.llmTool',
+            i18nParams: {
+              tool: toolLabel !== `tool.${event.tool}` ? toolLabel : event.tool,
+            },
+          });
           sink.trackUsage({ toolCalls: 1 });
         }
         if (event.type === 'tool_result') {
           sink.log('result', JSON.stringify(event.output).slice(0, 1000), { tool: event.tool });
+        }
+        if (event.type === 'rewrite') {
+          sink.setStatus('running', rt(locale, 'log.rewritingReport'));
+          sink.log('thought', 'Localizing report…', {
+            i18nKey: 'log.rewritingReport',
+            attempt: event.attempt,
+          });
+        }
+        if (event.type === 'rewrite_progress') {
+          sink.setStatus(
+            'running',
+            rt(locale, 'log.rewritingProgress', { n: event.chars })
+          );
+        }
+        if (event.type === 'rewrite_skip') {
+          const key =
+            event.reason === 'preference'
+              ? 'log.rewriteSkippedPreference'
+              : event.reason === 'length'
+                ? 'log.rewriteSkippedLength'
+                : 'log.rewriteSkippedMismatch';
+          sink.log('thought', key, {
+            i18nKey: key,
+            i18nParams: { n: event.chars ?? 0 },
+            reason: event.reason,
+          });
         }
       },
     });
@@ -353,23 +504,81 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
     sink.trackUsage({ tokensApprox, agentRuns: 1 });
 
     if (escalated) {
-      sink.escalate(escalated.summary, escalated.options, { theme, source: 'llm' });
-      slog('agent.escalate', { agentId: agent.id, source: 'llm' });
+      let findings = (escalated.findings ?? [])
+        .slice(0, 5)
+        .map((r) =>
+          formatSearchFinding(r, locale)
+            .replace(/[\u0000-\u001f]+/g, ' ')
+            .slice(0, 400)
+        );
+      if (findings.length === 0 && upstream) {
+        findings = clipUpstreamFindings(upstream, locale);
+      }
+      sink.escalate(escalated.summary, escalated.options, {
+        theme,
+        source: 'llm',
+        locale,
+        languageMismatch: Boolean(escalated.languageMismatch),
+        findings,
+        ...(escalated.summaryKey
+          ? {
+              summaryKey: escalated.summaryKey,
+              summaryParams: escalated.summaryParams ?? { theme },
+            }
+          : {}),
+        ...(escalated.optionKeys ? { optionKeys: escalated.optionKeys } : {}),
+      });
+      slog('agent.escalate', {
+        agentId: agent.id,
+        source: 'llm',
+        locale,
+        languageMismatch: Boolean(escalated.languageMismatch),
+        findings: findings.length,
+      });
       return;
     }
 
-    const report =
-      text.trim().length > 40
-        ? `${text}${upstream ? `\n\n---\n\n_Upstream report was provided to this agent._` : ''}`
-        : buildReport(agent, ['LLM returned a short answer; structured fallback used.'], humanGuidance);
+    const structuredFindings =
+      searchFindings.length > 0
+        ? searchFindings.map((r) => formatSearchFinding(r, locale))
+        : upstream
+          ? clipUpstreamFindings(upstream, locale)
+          : [rt(locale, 'report.llmFallback')];
 
-    sink.saveReport(`${agent.name}: ${theme}`, report);
-    sink.log('result', 'LLM report saved.');
+    const useStructured =
+      text.trim().length <= 40 || Boolean(reportNeedsStructuredFallback);
+
+    let report = useStructured
+      ? buildReport(agent, structuredFindings, humanGuidance, locale)
+      : `${text}${
+          upstream
+            ? `\n\n---\n\n_${rt(locale, 'llm.upstreamProvided')}_`
+            : ''
+        }`;
+
+    if (reportNeedsStructuredFallback && useStructured) {
+      report += `\n\n_${rt(locale, 'report.languageFallbackNote')}_`;
+    }
+
+    sink.saveReport(`${labelFor(agent, locale)}: ${theme}`, report);
+    sink.log('result', 'LLM report saved.', { i18nKey: 'log.llmReportSaved' });
     sink.setStatus('completed', 'Completed — report ready');
-    slog('agent.complete', { agentId: agent.id, name: agent.name, mode: 'llm', tokensApprox });
+    slog('agent.complete', {
+      agentId: agent.id,
+      name: agent.name,
+      mode: 'llm',
+      tokensApprox,
+      reportFallback: Boolean(reportNeedsStructuredFallback),
+      rewriteSkipReason: rewriteSkipReason ?? null,
+    });
   } catch (err) {
     const { code, message } = classifyError(
-      err instanceof RuntimeError ? err : new RuntimeError('llm_error', err instanceof Error ? err.message : 'LLM execution failed')
+      err instanceof RuntimeError
+        ? err
+        : new RuntimeError(
+            'llm_error',
+            err instanceof Error ? err.message : 'LLM execution failed'
+          )
     );
     sink.log('error', message, { code });
     sink.setStatus('error', shortTaskForError(code, message));
@@ -380,24 +589,27 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
 async function runPassInner(
   agent: Agent,
   sink: ExecutorSink,
-  humanGuidance?: string | null
+  humanGuidance: string | null | undefined,
+  locale: Locale
 ) {
   if (hasLlmKey()) {
-    await runLlmPass(agent, sink, humanGuidance);
+    await runLlmPass(agent, sink, humanGuidance, locale);
   } else {
-    await runStructuredPass(agent, sink, humanGuidance);
+    await runStructuredPass(agent, sink, humanGuidance, locale);
   }
 }
 
 export async function executeAgentPass(
   agent: Agent,
   sink: ExecutorSink,
-  opts: { humanGuidance?: string | null; timeoutMs?: number } = {}
+  opts: { humanGuidance?: string | null; timeoutMs?: number; locale?: Locale } = {}
 ) {
+  const locale = resolveAgentLocale(agent, opts.locale);
   const timeoutMs = opts.timeoutMs ?? AGENT_PASS_TIMEOUT_MS;
   slog('agent.start', {
     agentId: agent.id,
     name: agent.name,
+    locale,
     pipelineIndex: agent.config.pipeline_index ?? null,
     pipelineId: agent.config.pipeline_id ?? null,
   });
@@ -412,19 +624,31 @@ export async function executeAgentPass(
   });
 
   try {
-    await Promise.race([runPassInner(agent, sink, opts.humanGuidance), timer]);
+    await Promise.race([runPassInner(agent, sink, opts.humanGuidance, locale), timer]);
   } catch (err) {
     const { code, message } = classifyError(err);
     sink.log('error', message, { code, timedOut });
     if (code === 'timeout') {
+      const theme = String(agent.config.theme ?? agent.name);
+      const seconds = Math.round(timeoutMs / 1000);
       sink.escalate(
-        `Pass timed out after ${Math.round(timeoutMs / 1000)}s on “${String(agent.config.theme ?? agent.name)}”. Resume with narrower scope, or abort?`,
+        `Pass timed out after ${seconds}s on “${theme}”. Resume with narrower scope, or abort?`,
         [
           'Approve and continue with narrower scope',
           'Retry with current direction',
           'Abort the agent',
         ],
-        { code: 'timeout' }
+        {
+          code: 'timeout',
+          locale,
+          summaryKey: 'escalate.summaryTimeout',
+          summaryParams: { seconds, theme },
+          optionKeys: [
+            'escalate.optionApproveNarrower',
+            'escalate.optionRetryCurrent',
+            'escalate.optionAbort',
+          ],
+        }
       );
       slog('agent.escalate', { agentId: agent.id, reason: 'timeout' });
       return;

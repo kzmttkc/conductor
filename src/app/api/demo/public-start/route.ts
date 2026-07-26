@@ -10,6 +10,11 @@ import { persistStoreToResponse } from '@/lib/demo/persist';
 import { clientKey, rateLimit } from '@/lib/security/rate-limit';
 import { clipTheme } from '@/lib/security/validate';
 import { slog } from '@/lib/runtime/observability';
+import {
+  getPreferJaSources,
+  getPreferStructuredJa,
+  getServerLocale,
+} from '@/i18n/locale-server';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -53,7 +58,17 @@ export async function POST(request: Request) {
   const store = new DemoStore();
   store.markOnboarded(user.id);
 
-  const agents = await store.launchTemplateAndRun(user.id, SOLO_SCOUT_ID, theme);
+  const locale = await getServerLocale();
+  const preferJa = await getPreferJaSources();
+  const preferStructured = await getPreferStructuredJa();
+  const agents = await store.launchTemplateAndRun(
+    user.id,
+    SOLO_SCOUT_ID,
+    theme,
+    locale,
+    preferJa,
+    preferStructured
+  );
 
   // Ensure escalation has time to land if runtime returned early
   const pending = store.listEscalations(user.id, 'pending');

@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/i18n/locale-context';
 
 const KEY = 'conductor-cookie-ok';
 
 /** Minimal essential-cookie notice for marketing surfaces. */
 export function EssentialCookieNotice() {
   const [visible, setVisible] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     try {
@@ -23,9 +25,9 @@ export function EssentialCookieNotice() {
   return (
     <div className="fixed bottom-3 inset-x-3 z-[60] mx-auto max-w-lg rounded-xl border border-[#e4e4e0] bg-white/95 p-4 shadow-lg text-[#141414]">
       <p className="text-sm leading-relaxed">
-        We use essential cookies for sign-in and demo sessions.{' '}
+        {t('cookie.body')}{' '}
         <Link href="/privacy#cookies" className="underline underline-offset-2">
-          Cookie notice
+          {t('cookie.link')}
         </Link>
       </p>
       <Button
@@ -40,7 +42,7 @@ export function EssentialCookieNotice() {
           setVisible(false);
         }}
       >
-        Got it
+        {t('cookie.gotIt')}
       </Button>
     </div>
   );

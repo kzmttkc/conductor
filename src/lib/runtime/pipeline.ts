@@ -1,5 +1,10 @@
 import { randomUUID } from 'crypto';
 import type { Agent } from '@/lib/supabase/types';
+import { rt } from '@/lib/runtime/locale';
+import {
+  agentLabel,
+  displayNameJaFromConfig,
+} from '@/lib/templates/ja-overlays';
 
 export type PipelineConfig = {
   pipeline: boolean;
@@ -97,19 +102,29 @@ export function buildPipelineSummaryMarkdown(
   getArtifact: (agentId: string) => { content_markdown: string; title: string } | null
 ) {
   const theme = String(agents[0]?.config.theme ?? 'Mission');
+  const locale =
+    agents[0]?.config.locale === 'ja' || agents[0]?.config.locale === 'en'
+      ? agents[0].config.locale
+      : 'en';
   const lines = agents.map((a, i) => {
     const art = getArtifact(a.id);
-    return `${i + 1}. **${a.name}** (${a.status})${art ? ` — ${art.title}` : ''}`;
+    const name = agentLabel(a.name, locale, {
+      displayNameJa: displayNameJaFromConfig(a.config),
+    });
+    const statusKey = `status.${a.status}`;
+    const statusLabel = rt(locale, statusKey);
+    const status = statusLabel !== statusKey ? statusLabel : a.status;
+    return `${i + 1}. **${name}** (${status})${art ? ` — ${art.title}` : ''}`;
   });
-  return `# Pipeline summary — ${theme}
+  return `# ${rt(locale, 'report.pipelineSummary', { theme })}
 
-**Pipeline id:** ${String(agents[0]?.config.pipeline_id ?? 'n/a')}  
-**Completed:** ${new Date().toISOString()}
+**${rt(locale, 'narrative.pipelineId')}:** ${String(agents[0]?.config.pipeline_id ?? 'n/a')}  
+**${rt(locale, 'narrative.pipelineCompleted')}:** ${new Date().toISOString()}
 
-## Stages
+## ${rt(locale, 'report.stages')}
 ${lines.join('\n')}
 
-## Notes
-All stage reports are available as individual artifacts. This summary marks the crew run as finished.
+## ${rt(locale, 'report.notes')}
+${rt(locale, 'narrative.pipelineNotes')}
 `;
 }

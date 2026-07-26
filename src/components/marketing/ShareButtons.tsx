@@ -5,22 +5,23 @@ import { Check, Link2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useT } from '@/i18n/locale-context';
 
-const DEFAULT_TEXT =
-  'When agents need judgment, Conductor makes it a 3-second decision. Try the public demo:';
 const FALLBACK_ORIGIN = 'https://conductor-blond-xi.vercel.app';
 
 export function ShareButtons({
   path = '/demo/moment',
-  text = DEFAULT_TEXT,
+  text,
   tone = 'dark',
 }: {
   path?: string;
   text?: string;
   tone?: 'dark' | 'light';
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const [origin, setOrigin] = useState(FALLBACK_ORIGIN);
+  const shareText = text ?? t('share.caption');
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -28,12 +29,12 @@ export function ShareButtons({
 
   const url = `${origin}${path}`;
   const encodedUrl = encodeURIComponent(url);
-  const encodedText = encodeURIComponent(`${text} ${url}`);
+  const encodedText = encodeURIComponent(`${shareText} ${url}`);
 
   async function copy() {
     await navigator.clipboard.writeText(url);
     setCopied(true);
-    toast.success('Link copied');
+    toast.success(t('share.copied'));
     setTimeout(() => setCopied(false), 1500);
   }
 
@@ -46,19 +47,26 @@ export function ShareButtons({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button type="button" variant="outline" size="sm" className={outline} onClick={copy} aria-label="Copy share link">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={outline}
+        onClick={copy}
+        aria-label={t('share.copyAria')}
+      >
         {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-        Copy link
+        {t('share.copyLink')}
       </Button>
       <Button asChild size="sm" className={solid}>
         <a
           href={`https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`}
           target="_blank"
           rel="noreferrer"
-          aria-label="Share on X"
+          aria-label={t('share.xAria')}
         >
           <Share2 className="h-4 w-4" />
-          Post on X
+          {t('share.postX')}
         </a>
       </Button>
       <Button asChild size="sm" variant="outline" className={outline}>
@@ -66,9 +74,9 @@ export function ShareButtons({
           href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`}
           target="_blank"
           rel="noreferrer"
-          aria-label="Share on LinkedIn"
+          aria-label={t('share.linkedinAria')}
         >
-          LinkedIn
+          {t('share.linkedin')}
         </a>
       </Button>
     </div>

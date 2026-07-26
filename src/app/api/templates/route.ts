@@ -10,6 +10,11 @@ import { listBundledTemplates } from '@/lib/templates/catalog';
 import { clientKey, rateLimit } from '@/lib/security/rate-limit';
 import { clipTheme } from '@/lib/security/validate';
 import { slog } from '@/lib/runtime/observability';
+import {
+  getPreferJaSources,
+  getPreferStructuredJa,
+  getServerLocale,
+} from '@/i18n/locale-server';
 
 export async function GET(request: Request) {
   if (isDemoMode()) {
@@ -81,13 +86,36 @@ export async function POST(request: Request) {
         store.assertUsageBudget(user.id);
       } catch (e) {
         const err = e as Error & { code?: string; upgrade_to?: string };
+        const usageErr = err as Error & {
+          upgrade_to?: string;
+          plan?: string;
+          n?: number;
+          metric?: string;
+        };
         return NextResponse.json(
-          { error: err.message, code: 'USAGE_LIMIT', upgrade_to: err.upgrade_to },
+          {
+            error: usageErr.message,
+            code: 'USAGE_LIMIT',
+            upgrade_to: usageErr.upgrade_to,
+            plan: usageErr.plan ?? plan,
+            n: usageErr.n,
+            metric: usageErr.metric,
+          },
           { status: 403 }
         );
       }
       try {
-        const agents = await store.launchTemplateAndRun(user.id, templateId, theme);
+        const locale = await getServerLocale();
+        const preferJa = await getPreferJaSources();
+        const preferStructured = await getPreferStructuredJa();
+        const agents = await store.launchTemplateAndRun(
+          user.id,
+          templateId,
+          theme,
+          locale,
+          preferJa,
+          preferStructured
+        );
         store.markOnboarded(user.id);
         return NextResponse.json({ agents }, { status: 201 });
       } catch (e) {
@@ -116,7 +144,15 @@ export async function POST(request: Request) {
 
   const plan = await data.getPlan(user.id);
   try {
-    const agents = await launchTemplateProd(user.id, templateId, theme, plan);
+    const agents = await launchTemplateProd(
+      user.id,
+      templateId,
+      theme,
+      plan,
+      await getServerLocale(),
+      await getPreferJaSources(),
+      await getPreferStructuredJa()
+    );
     return NextResponse.json({ agents }, { status: 201 });
   } catch (e) {
     if (e instanceof RuntimeError && e.code === 'conflict') {

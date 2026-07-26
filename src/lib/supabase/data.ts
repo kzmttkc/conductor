@@ -72,18 +72,36 @@ export async function assertUsageBudget(userId: string, plan: PlanTier) {
     slog('plan.limit_hit', { userId, plan, metric: 'agentRuns', value: usage.agentRuns });
     const err = new Error(
       `Plan limit: ${limits.label} hard cap (~${hardRuns} runs) reached.`
-    ) as Error & { code: string; upgrade_to: string };
+    ) as Error & {
+      code: string;
+      upgrade_to: string;
+      plan: string;
+      n: number;
+      metric: string;
+    };
     err.code = 'USAGE_LIMIT';
     err.upgrade_to = upgrade_to;
+    err.plan = plan;
+    err.n = hardRuns;
+    err.metric = 'agentRuns';
     throw err;
   }
   if (usage.tokensApprox >= hardTokens) {
     slog('plan.limit_hit', { userId, plan, metric: 'tokensApprox', value: usage.tokensApprox });
     const err = new Error(
       `Plan limit: ${limits.label} hard token cap (~${hardTokens}) reached.`
-    ) as Error & { code: string; upgrade_to: string };
+    ) as Error & {
+      code: string;
+      upgrade_to: string;
+      plan: string;
+      n: number;
+      metric: string;
+    };
     err.code = 'USAGE_LIMIT';
     err.upgrade_to = upgrade_to;
+    err.plan = plan;
+    err.n = hardTokens;
+    err.metric = 'tokensApprox';
     throw err;
   }
   if (usage.agentRuns >= limits.maxAgentRuns) {

@@ -15,6 +15,8 @@ import {
 import * as data from '@/lib/supabase/data';
 import type { Agent, PlanTier } from '@/lib/supabase/types';
 import { getBundledTemplate } from '@/lib/templates/catalog';
+import { agentLabel, localizeAgentDefinition } from '@/lib/templates/ja-overlays';
+import { rt } from '@/lib/runtime/locale';
 
 async function loadAgent(agentId: string): Promise<Agent | null> {
   const { createClient } = await import('@/lib/supabase/server');
@@ -28,9 +30,19 @@ async function loadAgent(agentId: string): Promise<Agent | null> {
   return (row as Agent | null) ?? null;
 }
 
-export async function startProdAgent(agentId: string, humanGuidance?: string | null) {
-  const agent = await loadAgent(agentId);
+export async function startProdAgent(
+  agentId: string,
+  humanGuidance?: string | null,
+  locale?: 'en' | 'ja'
+) {
+  let agent = await loadAgent(agentId);
   if (!agent) return null;
+
+  if (locale) {
+    agent = await data.updateAgent(agentId, {
+      config: { ...agent.config, locale },
+    });
+  }
 
   if (agent.status === 'running' || !tryAcquireAgentLock(agentId)) {
     throw new RuntimeError('conflict', 'Agent is already running');
@@ -97,7 +109,12 @@ export async function startProdAgent(agentId: string, humanGuidance?: string | n
 
     const sink = createAwaitableDbSink(working);
     try {
-      await executeAgentPass(working, sink, { humanGuidance });
+      const passLocale =
+        locale ??
+        (working.config.locale === 'ja' || working.config.locale === 'en'
+          ? working.config.locale
+          : undefined);
+      await executeAgentPass(working, sink, { humanGuidance, locale: passLocale });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Runtime failed';
       await data.insertLog(agentId, 'error', message);
@@ -141,6 +158,7 @@ async function maybeContinuePipeline(completed: Agent) {
       await data.insertLog(completed.id, 'result', 'Pipeline summary artifact saved', {
         type: 'handoff',
         pipeline_id: completed.config.pipeline_id,
+        i18nKey: 'log.pipelineSummarySaved',
       });
     }
     return;
@@ -167,6 +185,8 @@ async function maybeContinuePipeline(completed: Agent) {
       type: 'handoff',
       reason: gate.reason,
       pipeline_id: completed.config.pipeline_id,
+      i18nKey: 'log.pipelineGated',
+      i18nParams: { detail: gate.detail },
     });
     slog('pipeline.handoff', {
       from: completed.id,
@@ -189,18 +209,31 @@ async function maybeContinuePipeline(completed: Agent) {
     pipelineIds,
     index
   );
+  const nextLocale =
+    completed.config.locale === 'ja' || completed.config.locale === 'en'
+      ? completed.config.locale
+      : 'en';
+  const displayName = agentLabel(completed.name, nextLocale, {
+    displayNameJa:
+      typeof completed.config.display_name_ja === 'string'
+        ? completed.config.display_name_ja
+        : null,
+  });
   await data.updateAgent(nextId, {
     status: 'idle',
     current_task: `Continuing pipeline after ${completed.name}`,
     config: {
       ...next.config,
       upstream_reports: upstream,
+      locale: nextLocale,
     },
   });
   await data.insertLog(nextId, 'action', `Handoff from ${completed.name}`, {
     type: 'handoff',
     from: completed.id,
     pipeline_id: completed.config.pipeline_id,
+    i18nKey: 'log.handoffFrom',
+    i18nParams: { name: displayName },
   });
   slog('pipeline.handoff', {
     from: completed.id,
@@ -209,14 +242,17 @@ async function maybeContinuePipeline(completed: Agent) {
     upstreamChars: upstream.length,
     pipelineId: completed.config.pipeline_id,
   });
-  await startProdAgent(nextId);
+  await startProdAgent(nextId, null, nextLocale);
 }
 
 export async function launchTemplateProd(
   userId: string,
   templateId: string,
   theme: string,
-  plan: PlanTier
+  plan: PlanTier,
+  locale: 'en' | 'ja' = 'en',
+  preferJaSources = false,
+  preferStructuredJa = false
 ) {
   const template = getBundledTemplate(templateId);
   if (!template) throw new Error('Template not found');
@@ -225,18 +261,22 @@ export async function launchTemplateProd(
   await data.assertUsageBudget(userId, plan);
 
   const created: Agent[] = [];
-  for (const def of template.agent_definitions) {
+  for (const raw of template.agent_definitions) {
+    const def = localizeAgentDefinition(raw, locale);
     const agent = await data.createAgentRow({
       user_id: userId,
       name: def.name,
       role: def.role,
-      current_task: `${def.goal} — Theme: ${theme}`,
+      current_task: rt(locale, 'log.goalTheme', { goal: def.goal, theme }),
       permissions: def.permissions,
       config: {
         goal: def.goal,
         system_prompt: def.system_prompt,
         escalation_conditions: def.escalation_conditions,
         theme,
+        locale,
+        prefer_ja_sources: preferJaSources,
+        prefer_structured_ja: preferStructuredJa,
       },
       template_id: template.id,
       status: 'idle',
@@ -246,39 +286,67 @@ export async function launchTemplateProd(
 
   const patches = attachPipelineConfig(created, template.pipeline);
   for (const p of patches) {
-    await data.updateAgent(p.id, { config: p.config });
+    await data.updateAgent(p.id, { config: { ...p.config, locale } });
   }
 
   if (template.pipeline) {
-    await startProdAgent(created[0].id);
+    await startProdAgent(created[0].id, null, locale);
   } else {
-    await Promise.all(created.map((a) => startProdAgent(a.id)));
+    await Promise.all(created.map((a) => startProdAgent(a.id, null, locale)));
   }
 
   const refreshed = await Promise.all(created.map((a) => loadAgent(a.id)));
   return refreshed.filter(Boolean) as Agent[];
 }
 
-export async function recoverProdAgent(agentId: string) {
-  await data.insertLog(agentId, 'action', 'Commander requested recovery / retry');
-  return startProdAgent(agentId, 'Retry after error. Prefer safe sources.');
+export async function recoverProdAgent(agentId: string, locale?: 'en' | 'ja') {
+  await data.insertLog(agentId, 'action', 'Recovery / retry requested', {
+    i18nKey: 'log.recoveryRequested',
+  });
+  const agent = await loadAgent(agentId);
+  const loc =
+    locale ??
+    (agent?.config.locale === 'ja' || agent?.config.locale === 'en'
+      ? agent.config.locale
+      : 'en');
+  const { rt } = await import('@/lib/runtime/locale');
+  return startProdAgent(agentId, rt(loc, 'llm.recoverGuidance'), loc);
 }
 
-export async function resumeProdAgent(agentId: string, humanResponse: string) {
+export async function resumeProdAgent(
+  agentId: string,
+  humanResponse: string,
+  locale?: 'en' | 'ja'
+) {
   const agent = await loadAgent(agentId);
   if (!agent) return null;
-  if (/allow web_search|allow browser|allow file_write/i.test(humanResponse)) {
+  if (
+    /allow\s+web_search|web_search\s*を許可|この実行で\s*web_search/i.test(
+      humanResponse
+    ) ||
+    /allow\s+browser|browser\s*を許可|この実行で\s*browser/i.test(humanResponse) ||
+    /allow\s+file_write|file_write\s*を許可|この実行で\s*file_write/i.test(
+      humanResponse
+    )
+  ) {
     const permissions = { ...agent.permissions };
     for (const tool of ['web_search', 'browser', 'file_write'] as const) {
-      if (new RegExp(`allow ${tool}`, 'i').test(humanResponse)) {
+      if (
+        new RegExp(`allow\\s+${tool}`, 'i').test(humanResponse) ||
+        new RegExp(`${tool}\\s*を許可`, 'i').test(humanResponse) ||
+        new RegExp(`この実行で\\s*${tool}`, 'i').test(humanResponse)
+      ) {
         permissions[tool] = 'allow';
       }
-      if (new RegExp(`deny ${tool}`, 'i').test(humanResponse)) {
+      if (
+        new RegExp(`deny\\s+${tool}`, 'i').test(humanResponse) ||
+        new RegExp(`${tool}\\s*を拒否`, 'i').test(humanResponse)
+      ) {
         permissions[tool] = 'deny';
       }
     }
     await data.updateAgent(agentId, { permissions });
   }
   slog('agent.resume', { agentId });
-  return startProdAgent(agentId, humanResponse);
+  return startProdAgent(agentId, humanResponse, locale);
 }

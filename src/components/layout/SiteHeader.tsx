@@ -1,14 +1,11 @@
-/**
- * Public SiteHeader — Landing / Demo / Login / legal pages.
- * App shell uses a thinner header (side/bottom nav owns navigation).
- */
-
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { BrandInline } from '@/components/brand';
+import { LocaleToggle } from '@/components/i18n/LocaleToggle';
+import { useT } from '@/i18n/locale-context';
 
 type Props = {
   signedIn?: boolean;
@@ -17,6 +14,7 @@ type Props = {
 export function SiteHeader({ signedIn = false }: Props) {
   const pathname = usePathname();
   const isMoment = Boolean(pathname?.startsWith('/demo/moment'));
+  const t = useT();
 
   return (
     <header
@@ -28,7 +26,7 @@ export function SiteHeader({ signedIn = false }: Props) {
       )}
     >
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-5">
-        <Link href="/" aria-label="Conductor home" className="min-w-0">
+        <Link href="/" aria-label={t('a11y.home')} className="min-w-0">
           <BrandInline
             markClassName={cn(
               'h-7 w-7',
@@ -41,7 +39,8 @@ export function SiteHeader({ signedIn = false }: Props) {
           />
         </Link>
 
-        <nav className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <LocaleToggle tone={isMoment ? 'dark' : 'light'} />
           <Link
             href="/demo/moment"
             className={cn(
@@ -51,7 +50,7 @@ export function SiteHeader({ signedIn = false }: Props) {
                 : 'text-[#6b6b66] hover:text-[#141414]'
             )}
           >
-            Needs You
+            {t('nav.needsYou')}
           </Link>
 
           {signedIn ? (
@@ -64,7 +63,7 @@ export function SiteHeader({ signedIn = false }: Props) {
                   : 'bg-[#141414] text-[#fafafa]'
               )}
             >
-              Open Dashboard
+              {t('nav.openDashboard')}
             </Link>
           ) : (
             <>
@@ -77,7 +76,7 @@ export function SiteHeader({ signedIn = false }: Props) {
                     : 'text-[#6b6b66] hover:text-[#141414]'
                 )}
               >
-                Sign in
+                {t('nav.signIn')}
               </Link>
               <Link
                 href="/demo"
@@ -88,7 +87,7 @@ export function SiteHeader({ signedIn = false }: Props) {
                     : 'bg-[#141414] text-[#fafafa]'
                 )}
               >
-                Try live demo
+                {t('nav.tryDemo')}
               </Link>
             </>
           )}

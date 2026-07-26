@@ -19,13 +19,13 @@ export function visitorFromSession(session: string | undefined | null) {
     return {
       id: '00000000-0000-4000-8000-000000000001',
       email: 'commander@conductor.local',
-      name: 'Commander',
+      name: 'You',
     };
   }
   if (!isUuid(session)) return null;
   return {
     id: session,
     email: `commander-${session.slice(0, 8)}@conductor.demo`,
-    name: 'Commander',
+    name: 'You',
   };
 }

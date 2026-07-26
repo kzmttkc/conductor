@@ -9,6 +9,7 @@ import { RuntimeError } from '@/lib/runtime/errors';
 import { clientKey, rateLimit } from '@/lib/security/rate-limit';
 import { validateEscalationBody } from '@/lib/security/validate';
 import { slog } from '@/lib/runtime/observability';
+import { getServerLocale } from '@/i18n/locale-server';
 
 export async function GET(
   request: Request,
@@ -91,7 +92,8 @@ export async function POST(
       const updated = store.resolveEscalation(id, action, humanResponse);
       if (updated && action !== 'cancel') {
         try {
-          await store.resumeAgent(updated.agent_id, humanResponse);
+          const locale = await getServerLocale();
+          await store.resumeAgent(updated.agent_id, humanResponse, locale);
         } catch (e) {
           if (e instanceof RuntimeError && e.code === 'conflict') {
             return NextResponse.json(
@@ -159,17 +161,25 @@ export async function POST(
   if (action === 'cancel') {
     await data.updateAgent(agent.id, {
       status: 'idle',
-      current_task: 'Stopped by commander',
+      current_task: 'Stopped by user',
     });
-    await data.insertLog(agent.id, 'action', `Cancelled by human: ${humanResponse}`);
+    await data.insertLog(agent.id, 'action', `Cancelled by human: ${humanResponse}`, {
+      i18nKey: 'log.cancelledByHuman',
+      i18nParams: { response: humanResponse },
+    });
   } else {
     await data.insertLog(
       agent.id,
       'action',
-      `Human ${action === 'approve' ? 'approved' : 'revised'}: ${humanResponse}`
+      `Human ${action === 'approve' ? 'approved' : 'revised'}: ${humanResponse}`,
+      {
+        i18nKey: action === 'approve' ? 'log.humanApproved' : 'log.humanRevised',
+        i18nParams: { response: humanResponse },
+      }
     );
     try {
-      await resumeProdAgent(agent.id, humanResponse);
+      const locale = await getServerLocale();
+      await resumeProdAgent(agent.id, humanResponse, locale);
     } catch (e) {
       if (e instanceof RuntimeError && e.code === 'conflict') {
         return NextResponse.json(
