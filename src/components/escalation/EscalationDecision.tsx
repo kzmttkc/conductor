@@ -292,14 +292,11 @@ export function EscalationDecision({
             />
           </div>
 
-          <div
-            className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-background/95 backdrop-blur md:static md:border-0 md:bg-transparent md:backdrop-blur-none md:p-0"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
+          <div className="fixed bottom-0 inset-x-0 z-30 border-t border-border bg-background/95 backdrop-blur pb-safe md:static md:border-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:pb-0">
             <div className="mx-auto max-w-3xl grid gap-2 grid-cols-3 p-3 md:p-0">
               <Button
                 variant="success"
-                className="h-12"
+                className="min-h-12 h-12"
                 disabled={!!submitting}
                 onClick={() => submit('approve')}
               >
@@ -315,7 +312,7 @@ export function EscalationDecision({
               </Button>
               <Button
                 variant="outline"
-                className="h-12"
+                className="min-h-12 h-12"
                 disabled={!!submitting}
                 onClick={() => submit('revise')}
               >
@@ -331,7 +328,7 @@ export function EscalationDecision({
               </Button>
               <Button
                 variant="destructive"
-                className="h-12"
+                className="min-h-12 h-12"
                 disabled={!!submitting}
                 onClick={() => submit('cancel')}
               >

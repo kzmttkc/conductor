@@ -41,31 +41,29 @@ export default function PublicDemoPage() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,#f4f6f3_0%,#e7eee8_50%,#dfe8e3_100%)] dark:bg-[linear-gradient(180deg,#0d1010_0%,#121816_100%)]" />
-      <div className="mx-auto max-w-xl px-6 py-16 md:py-24">
-        <Link href="/" className="font-display text-2xl tracking-tight">
-          Conductor
-        </Link>
-        <h1 className="font-display text-4xl md:text-5xl tracking-tight mt-10 leading-tight">
+    <div className="relative overflow-hidden bg-[#f4f6f3] text-[#141414]">
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,#f4f6f3_0%,#e7eee8_50%,#dfe8e3_100%)]" />
+      <div className="mx-auto max-w-xl px-5 sm:px-6 py-12 sm:py-16 md:py-20">
+        <h1 className="font-display text-4xl md:text-5xl tracking-tight leading-tight text-balance">
           Try the command tower
         </h1>
-        <p className="text-muted-foreground mt-4 leading-relaxed">
+        <p className="text-[#6b6b66] mt-4 leading-relaxed">
           No signup. One click launches Solo Scout, then a real{' '}
-          <span className="text-urgent font-medium">Needs You</span> escalation
+          <span className="text-[#d64545] font-medium">Needs You</span> escalation
           appears so you can feel the core loop in under a minute.
         </p>
 
-        <div className="surface rounded-2xl p-6 mt-8 space-y-4">
+        <div className="rounded-2xl border border-[#e4e4e0] bg-white/80 p-5 sm:p-6 mt-8 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="theme">Mission theme</Label>
             <Input
               id="theme"
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
+              className="min-h-12"
             />
           </div>
-          <Button className="w-full h-11" size="lg" onClick={start} disabled={loading}>
+          <Button className="w-full min-h-12" size="lg" onClick={start} disabled={loading}>
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -73,7 +71,12 @@ export default function PublicDemoPage() {
             )}
             Start public demo
           </Button>
-          <Button variant="outline" className="w-full" onClick={copyLink} type="button">
+          <Button
+            variant="outline"
+            className="w-full min-h-12"
+            onClick={copyLink}
+            type="button"
+          >
             <Share2 className="h-4 w-4" />
             Copy /demo link
           </Button>
@@ -87,7 +90,7 @@ export default function PublicDemoPage() {
           />
         </div>
 
-        <p className="text-xs text-muted-foreground mt-6 leading-relaxed">
+        <p className="text-xs text-[#6b6b66] mt-6 leading-relaxed">
           Prefer a static share preview of the escalation moment?{' '}
           <Link href="/demo/moment" className="underline underline-offset-2">
             Open Needs You moment

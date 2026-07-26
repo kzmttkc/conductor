@@ -77,14 +77,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="flex flex-1 items-center justify-center px-5 bg-[#f4f6f3] text-[#141414] py-12">
       <div className="w-full max-w-md">
-        <Link href="/" className="font-display text-3xl tracking-tight block mb-8">
-          Conductor
-        </Link>
-        <div className="surface rounded-2xl p-6 md:p-8 shadow-sm">
+        <div className="rounded-2xl border border-[#e4e4e0] bg-white/90 p-6 md:p-8 shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="text-sm text-[#6b6b66] mt-2">
             Magic Link or GitHub. Demo mode works without Supabase.
           </p>
 
@@ -98,23 +95,24 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required={!isDemoMode()}
+                className="min-h-12"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full min-h-12" disabled={loading}>
               <Mail className="h-4 w-4" />
               {isDemoMode() ? 'Continue with Demo' : 'Send magic link'}
             </Button>
           </form>
 
-          <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
+          <div className="my-5 flex items-center gap-3 text-xs text-[#6b6b66]">
+            <div className="h-px flex-1 bg-[#e4e4e0]" />
             or
-            <div className="h-px flex-1 bg-border" />
+            <div className="h-px flex-1 bg-[#e4e4e0]" />
           </div>
 
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full min-h-12"
             onClick={github}
             disabled={loading}
             type="button"
@@ -124,12 +122,24 @@ export default function LoginPage() {
           </Button>
 
           {isDemoMode() && (
-            <p className="mt-5 text-xs text-muted-foreground leading-relaxed">
+            <p className="mt-5 text-xs text-[#6b6b66] leading-relaxed">
               Demo Mode is on. You&apos;ll get a local command tower with Research
               Crew, realtime status, and full escalation flow — no cloud setup
               required.
             </p>
           )}
+
+          <p className="mt-6 text-xs text-[#6b6b66]">
+            By continuing you agree to our{' '}
+            <Link href="/terms" className="underline underline-offset-2">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="underline underline-offset-2">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </div>
       </div>
     </div>

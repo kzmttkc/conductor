@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Button } from '@/components/ui/button';
+import { BrandLockup } from '@/components/brand';
+import { PricingSection } from '@/components/marketing/PricingSection';
 
 export const metadata: Metadata = {
   title: 'Conductor — Command your AI agents',
@@ -21,47 +23,38 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="relative overflow-hidden bg-[#f4f6f3] text-[#141414]">
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#f4f6f3_0%,#e7eee8_45%,#dfe8e3_100%)] dark:bg-[linear-gradient(180deg,#0d1010_0%,#121816_50%,#0e1211_100%)]" />
-        <div className="absolute inset-0 opacity-[0.35] dark:opacity-[0.2] bg-[radial-gradient(circle_at_1px_1px,rgba(20,20,20,0.12)_1px,transparent_0)] bg-size-[22px_22px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,#f4f6f3_0%,#e7eee8_45%,#dfe8e3_100%)]" />
+        <div className="absolute inset-0 opacity-[0.35] bg-[radial-gradient(circle_at_1px_1px,rgba(20,20,20,0.12)_1px,transparent_0)] bg-size-[22px_22px]" />
       </div>
 
-      <div className="mx-auto max-w-5xl px-6 pt-10 pb-20">
-        <nav className="flex items-center justify-between">
-          <p className="font-display text-2xl tracking-tight">Conductor</p>
-          <div className="flex gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/demo/moment">Needs You</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/login">Sign in</Link>
-            </Button>
-          </div>
-        </nav>
-
-        <section className="mt-24 md:mt-32 max-w-3xl">
-          <h1 className="font-display text-5xl md:text-7xl leading-[0.95] tracking-tight text-balance">
-            Conductor
-          </h1>
-          <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-xl text-balance">
+      <div className="mx-auto max-w-5xl px-5 sm:px-6 pb-24 pt-12 sm:pt-16">
+        <section className="max-w-3xl">
+          <BrandLockup
+            className="items-start gap-4"
+            wordmarkAs="h1"
+            markClassName="h-20 w-20 sm:h-24 sm:w-24 !text-[#001444]"
+            wordmarkClassName="text-4xl sm:text-5xl md:text-6xl tracking-[0.2em] !text-[#001444]"
+          />
+          <p className="mt-8 text-lg md:text-xl text-[#6b6b66] max-w-xl text-balance">
             One human. A crew of agents. Clear authority, full visibility, and
             escalations that respect your attention.
           </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Button asChild size="lg">
+          <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3">
+            <Button asChild size="lg" className="min-h-12 w-full sm:w-auto">
               <Link href="/demo">Try live demo — no signup</Link>
             </Button>
-            <Button asChild variant="outline" size="lg">
+            <Button asChild variant="outline" size="lg" className="min-h-12 w-full sm:w-auto">
               <Link href="/demo/moment">See the Needs You moment</Link>
             </Button>
           </div>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Public URL: <code className="text-foreground">/demo</code> — share it anywhere.
+          <p className="mt-4 text-sm text-[#6b6b66]">
+            Public URL: <code className="text-[#141414]">/demo</code> — share it anywhere.
           </p>
         </section>
 
-        <section className="mt-28 grid gap-8 md:grid-cols-3">
+        <section className="mt-20 sm:mt-28 grid gap-8 md:grid-cols-3">
           {[
             {
               title: 'Roles & permissions',
@@ -76,14 +69,16 @@ export default function HomePage() {
               body: 'When judgment is needed, decide in seconds — then resume.',
             },
           ].map((item) => (
-            <div key={item.title} className="border-t border-border pt-5">
+            <div key={item.title} className="border-t border-[#e4e4e0] pt-5">
               <h2 className="font-medium">{item.title}</h2>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              <p className="mt-2 text-sm text-[#6b6b66] leading-relaxed">
                 {item.body}
               </p>
             </div>
           ))}
         </section>
+
+        <PricingSection />
       </div>
     </div>
   );

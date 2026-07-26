@@ -1,6 +1,14 @@
 import { webSearch } from './web-search';
 import { hasLlmKey, runLlmAgentPass } from './llm';
 import type { Agent, PermissionLevel, ToolName } from '@/lib/supabase/types';
+import {
+  approvalOptionsForTool,
+  checkToolPermission,
+} from '@/lib/runtime/permission-guard';
+import { RuntimeError, classifyError, shortTaskForError } from '@/lib/runtime/errors';
+import { slog } from '@/lib/runtime/observability';
+
+export const AGENT_PASS_TIMEOUT_MS = 110_000;
 
 export type ExecutorSink = {
   log: (
@@ -20,38 +28,52 @@ function sleep(ms: number) {
 }
 
 async function runToolWithPermission(
+  agent: Agent,
   sink: ExecutorSink,
   tool: ToolName,
   run: () => Promise<string>
 ): Promise<'ok' | 'escalated' | 'denied'> {
-  const perm = sink.getPermission(tool);
-  if (perm === 'deny') {
-    sink.log('error', `Permission denied for tool: ${tool}`);
+  const decision = checkToolPermission(agent, tool);
+  if (!decision.ok && decision.level === 'deny') {
+    sink.log('error', decision.reason, {
+      code: 'permission_denied',
+      tool,
+    });
+    slog('agent.tool_call', {
+      agentId: agent.id,
+      tool,
+      result: 'permission_denied',
+    });
     return 'denied';
   }
-  if (perm === 'require_approval') {
+  if (!decision.ok && decision.level === 'require_approval') {
     sink.escalate(
       `Agent requests approval to use “${tool.replaceAll('_', ' ')}”. Allow this tool call?`,
-      [
-        `Allow ${tool} for this mission`,
-        `Deny ${tool} and continue without it`,
-        'Abort the agent',
-      ],
-      { tool, reason: 'require_approval' }
+      approvalOptionsForTool(tool),
+      { tool, reason: 'require_approval', code: 'require_approval' }
     );
+    slog('agent.escalate', { agentId: agent.id, tool, reason: 'require_approval' });
     return 'escalated';
   }
+
   sink.log('tool_call', `Calling ${tool}`, { tool });
+  slog('agent.tool_call', { agentId: agent.id, tool, result: 'allow' });
   sink.trackUsage({ toolCalls: 1 });
-  const out = await run();
-  sink.log('result', out.slice(0, 1200), { tool });
-  return 'ok';
+  try {
+    const out = await run();
+    sink.log('result', out.slice(0, 1200), { tool });
+    return 'ok';
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Tool failed';
+    sink.log('error', message, { code: 'tool_error', tool });
+    throw new RuntimeError('tool_error', message);
+  }
 }
 
 function upstreamBlock(agent: Agent) {
   const upstream = String(agent.config.upstream_reports ?? '').trim();
   return upstream
-    ? `\n## Upstream crew deliverables\n${upstream.slice(0, 6000)}\n`
+    ? `\n## Upstream report:\n${upstream.slice(0, 6000)}\n`
     : '';
 }
 
@@ -154,8 +176,11 @@ async function runStructuredPass(
   const upstream = String(agent.config.upstream_reports ?? '').trim();
   sink.log('thought', `Planning work on “${theme}”.`);
   if (upstream) {
-    sink.log('action', 'Reading upstream crew deliverables…');
-    sink.log('result', upstream.slice(0, 800));
+    sink.log('action', 'Upstream report: ingesting prior crew deliverable', {
+      event: 'pipeline.handoff',
+      chars: upstream.length,
+    });
+    sink.log('result', `Upstream report:\n${upstream.slice(0, 800)}`);
   }
   await sleep(400);
 
@@ -170,7 +195,7 @@ async function runStructuredPass(
     !(agent.role === 'Analyst' && upstream && sink.getPermission('web_search') === 'deny');
 
   if (wantsSearch && sink.getPermission('web_search') !== 'deny') {
-    const searchStatus = await runToolWithPermission(sink, 'web_search', async () => {
+    const searchStatus = await runToolWithPermission(agent, sink, 'web_search', async () => {
       const query =
         agent.name === 'Verifier' || agent.role === 'Fact Checker'
           ? `${theme} market size verification sources 2025 2026`
@@ -245,6 +270,7 @@ async function runStructuredPass(
           has_upstream: Boolean(upstream),
         }
       );
+      slog('agent.escalate', { agentId: agent.id, source: 'structured', theme });
       return;
     }
   }
@@ -266,6 +292,7 @@ async function runStructuredPass(
   sink.log('result', 'Report saved.');
   sink.setStatus('completed', 'Completed — report ready');
   sink.trackUsage({ agentRuns: 1 });
+  slog('agent.complete', { agentId: agent.id, name: agent.name, mode: 'structured' });
 }
 
 async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: string | null) {
@@ -281,7 +308,12 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
     sink.getPermission('web_search') === 'require_approval' &&
     !humanGuidance?.toLowerCase().includes('allow')
   ) {
-    const status = await runToolWithPermission(sink, 'web_search', async () => 'pending approval');
+    const status = await runToolWithPermission(
+      agent,
+      sink,
+      'web_search',
+      async () => 'pending approval'
+    );
     if (status === 'escalated') return;
   }
 
@@ -293,7 +325,7 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
       `Mission theme: ${theme}`,
       `Goal: ${String(agent.config.goal ?? agent.current_task ?? '')}`,
       humanGuidance ? `Human guidance: ${humanGuidance}` : 'No human guidance yet.',
-      upstream ? `\nUpstream crew reports:\n${upstream.slice(0, 8000)}` : '',
+      upstream ? `\nUpstream report:\n${upstream.slice(0, 8000)}` : '',
       '',
       agent.name === 'Verifier' || agent.role === 'Fact Checker'
         ? 'Verify important claims. Call escalate_to_human if a material claim cannot be corroborated.'
@@ -322,34 +354,83 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
 
     if (escalated) {
       sink.escalate(escalated.summary, escalated.options, { theme, source: 'llm' });
+      slog('agent.escalate', { agentId: agent.id, source: 'llm' });
       return;
     }
 
     const report =
       text.trim().length > 40
-        ? `${text}${upstream ? `\n\n---\n\n_Upstream context was provided to this agent._` : ''}`
+        ? `${text}${upstream ? `\n\n---\n\n_Upstream report was provided to this agent._` : ''}`
         : buildReport(agent, ['LLM returned a short answer; structured fallback used.'], humanGuidance);
 
     sink.saveReport(`${agent.name}: ${theme}`, report);
     sink.log('result', 'LLM report saved.');
     sink.setStatus('completed', 'Completed — report ready');
+    slog('agent.complete', { agentId: agent.id, name: agent.name, mode: 'llm', tokensApprox });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'LLM execution failed';
-    sink.log('error', message);
-    sink.setStatus('error', message);
+    const { code, message } = classifyError(
+      err instanceof RuntimeError ? err : new RuntimeError('llm_error', err instanceof Error ? err.message : 'LLM execution failed')
+    );
+    sink.log('error', message, { code });
+    sink.setStatus('error', shortTaskForError(code, message));
+    slog('agent.error', { agentId: agent.id, code, message });
+  }
+}
+
+async function runPassInner(
+  agent: Agent,
+  sink: ExecutorSink,
+  humanGuidance?: string | null
+) {
+  if (hasLlmKey()) {
+    await runLlmPass(agent, sink, humanGuidance);
+  } else {
+    await runStructuredPass(agent, sink, humanGuidance);
   }
 }
 
 export async function executeAgentPass(
   agent: Agent,
   sink: ExecutorSink,
-  opts: { humanGuidance?: string | null } = {}
+  opts: { humanGuidance?: string | null; timeoutMs?: number } = {}
 ) {
+  const timeoutMs = opts.timeoutMs ?? AGENT_PASS_TIMEOUT_MS;
+  slog('agent.start', {
+    agentId: agent.id,
+    name: agent.name,
+    pipelineIndex: agent.config.pipeline_index ?? null,
+    pipelineId: agent.config.pipeline_id ?? null,
+  });
   sink.setStatus('running', agent.current_task || 'Starting pass');
-  if (hasLlmKey()) {
-    await runLlmPass(agent, sink, opts.humanGuidance);
-  } else {
-    await runStructuredPass(agent, sink, opts.humanGuidance);
+
+  let timedOut = false;
+  const timer = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      timedOut = true;
+      reject(new RuntimeError('timeout', `Agent pass exceeded ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+  });
+
+  try {
+    await Promise.race([runPassInner(agent, sink, opts.humanGuidance), timer]);
+  } catch (err) {
+    const { code, message } = classifyError(err);
+    sink.log('error', message, { code, timedOut });
+    if (code === 'timeout') {
+      sink.escalate(
+        `Pass timed out after ${Math.round(timeoutMs / 1000)}s on “${String(agent.config.theme ?? agent.name)}”. Resume with narrower scope, or abort?`,
+        [
+          'Approve and continue with narrower scope',
+          'Retry with current direction',
+          'Abort the agent',
+        ],
+        { code: 'timeout' }
+      );
+      slog('agent.escalate', { agentId: agent.id, reason: 'timeout' });
+      return;
+    }
+    sink.setStatus('error', shortTaskForError(code, message));
+    slog('agent.error', { agentId: agent.id, code, message });
   }
 }
 

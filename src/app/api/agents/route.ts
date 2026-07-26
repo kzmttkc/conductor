@@ -5,6 +5,8 @@ import { withDemoApi } from '@/lib/demo/api';
 import { PLAN_LIMITS } from '@/lib/supabase/types';
 import * as data from '@/lib/supabase/data';
 import { startProdAgent } from '@/lib/runtime/prod-runner';
+import { RuntimeError } from '@/lib/runtime/errors';
+import { clipText } from '@/lib/security/validate';
 
 export async function GET(request: Request) {
   if (isDemoMode()) {
@@ -39,22 +41,34 @@ export async function POST(request: Request) {
       try {
         store.assertUsageBudget(user.id);
       } catch (e) {
+        const err = e as Error & { upgrade_to?: string };
         return NextResponse.json(
-          { error: e instanceof Error ? e.message : 'Usage limit', code: 'USAGE_LIMIT' },
+          {
+            error: err.message,
+            code: 'USAGE_LIMIT',
+            upgrade_to: err.upgrade_to,
+          },
           { status: 403 }
         );
       }
 
       const agent = store.createAgent({
         user_id: user.id,
-        name: body.name,
-        role: body.role,
-        current_task: body.current_task ?? body.goal ?? null,
+        name: clipText(body.name, 80) || 'Agent',
+        role: clipText(body.role, 80) || 'Operator',
+        current_task: clipText(body.current_task ?? body.goal ?? '', 500) || null,
         permissions: body.permissions ?? {},
         config: body.config ?? {},
-        status: body.start ? 'running' : 'idle',
+        status: 'idle',
       });
-      if (body.start) await store.startRuntime(agent.id);
+      try {
+        if (body.start) await store.startRuntime(agent.id);
+      } catch (e) {
+        if (e instanceof RuntimeError && e.code === 'conflict') {
+          return NextResponse.json({ error: e.message, code: 'CONFLICT' }, { status: 409 });
+        }
+        throw e;
+      }
       return NextResponse.json(store.getAgent(agent.id), { status: 201 });
     });
   }
@@ -75,13 +89,20 @@ export async function POST(request: Request) {
   }
   const agent = await data.createAgentRow({
     user_id: user.id,
-    name: body.name,
-    role: body.role,
-    current_task: body.current_task ?? body.goal ?? null,
+    name: clipText(body.name, 80) || 'Agent',
+    role: clipText(body.role, 80) || 'Operator',
+    current_task: clipText(body.current_task ?? body.goal ?? '', 500) || null,
     permissions: body.permissions ?? {},
     config: body.config ?? {},
     status: 'idle',
   });
-  if (body.start) await startProdAgent(agent.id);
+  try {
+    if (body.start) await startProdAgent(agent.id);
+  } catch (e) {
+    if (e instanceof RuntimeError && e.code === 'conflict') {
+      return NextResponse.json({ error: e.message, code: 'CONFLICT' }, { status: 409 });
+    }
+    throw e;
+  }
   return NextResponse.json(await data.getAgentForUser(user.id, agent.id), { status: 201 });
 }

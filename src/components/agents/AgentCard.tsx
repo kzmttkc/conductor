@@ -36,7 +36,7 @@ export function AgentCard({
             'h-full rounded-xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
             dragHandleProps && 'pl-5',
             isUrgent && 'urgent-ring border-urgent/40',
-            needsYou && 'bg-urgent/[0.05] ring-1 ring-urgent/30'
+            needsYou && 'bg-urgent/[0.08] ring-2 ring-urgent/45 shadow-[0_0_0_1px_rgba(214,69,69,0.25)]'
           )}
         >
           <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0 gap-3">

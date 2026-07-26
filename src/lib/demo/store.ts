@@ -13,7 +13,19 @@ import type {
 } from '@/lib/supabase/types';
 import { normalizePermission, PLAN_LIMITS } from '@/lib/supabase/types';
 import { executeAgentPass } from '@/lib/runtime/executor';
-import { attachPipelineConfig } from '@/lib/runtime/pipeline';
+import { RuntimeError } from '@/lib/runtime/errors';
+import {
+  releaseAgentLock,
+  tryAcquireAgentLock,
+} from '@/lib/runtime/locks';
+import { slog } from '@/lib/runtime/observability';
+import {
+  attachPipelineConfig,
+  buildPipelineSummaryMarkdown,
+  canStartPipelineStage,
+  collectUpstreamMarkdown,
+} from '@/lib/runtime/pipeline';
+import { sanitizeMarkdown, clipText } from '@/lib/security/validate';
 import { getBundledTemplate, listBundledTemplates } from '@/lib/templates/catalog';
 
 /** @deprecated Prefer visitorFromSession — kept for scripts/fixtures */
@@ -171,9 +183,9 @@ export class DemoStore extends EventEmitter {
       id: randomUUID(),
       agent_id: input.agent_id,
       user_id: input.user_id,
-      title: input.title,
+      title: clipText(input.title, 200),
       kind: input.kind ?? 'report',
-      content_markdown: input.content_markdown,
+      content_markdown: sanitizeMarkdown(input.content_markdown),
       created_at: this.now(),
     };
     this.artifacts.unshift(artifact);
@@ -383,23 +395,87 @@ export class DemoStore extends EventEmitter {
   private async continuePipeline(completedId: string) {
     const agent = this.getAgent(completedId);
     if (!agent?.config.pipeline) return;
-    const nextId = agent.config.pipeline_next as string | null;
-    if (!nextId) return;
     const pipelineIds = (agent.config.pipeline_ids as string[]) || [];
-    const index = Number(this.getAgent(nextId)?.config.pipeline_index ?? 0);
-    const chunks: string[] = [];
-    for (let i = 0; i < index; i++) {
-      const art = this.getLatestArtifactForAgent(pipelineIds[i]);
-      if (art) chunks.push(`### Upstream: ${art.title}\n\n${art.content_markdown}`);
+    const nextId = agent.config.pipeline_next as string | null;
+
+    if (!nextId) {
+      // Final stage — optional crew summary artifact
+      const crew = pipelineIds
+        .map((id) => this.getAgent(id))
+        .filter(Boolean) as Agent[];
+      if (crew.length > 1) {
+        const markdown = buildPipelineSummaryMarkdown(crew, (id) =>
+          this.getLatestArtifactForAgent(id)
+        );
+        this.saveArtifact({
+          agent_id: completedId,
+          user_id: agent.user_id,
+          title: `Pipeline summary: ${String(agent.config.theme ?? agent.name)}`,
+          content_markdown: markdown,
+          kind: 'report',
+        });
+        this.addLog(completedId, 'result', 'Pipeline summary artifact saved', {
+          type: 'handoff',
+          pipeline_id: agent.config.pipeline_id,
+        });
+      }
+      return;
     }
+
     const next = this.getAgent(nextId);
     if (!next) return;
+    const index = Number(next.config.pipeline_index ?? 0);
+    const gate = canStartPipelineStage({
+      index,
+      pipelineIds,
+      getAgent: (id) => this.getAgent(id),
+      getArtifact: (id) => this.getLatestArtifactForAgent(id),
+    });
+    if (!gate.ok) {
+      this.addLog(nextId, 'action', `Pipeline gated: ${gate.detail}`, {
+        type: 'handoff',
+        reason: gate.reason,
+        pipeline_id: agent.config.pipeline_id,
+      });
+      slog('pipeline.handoff', {
+        from: completedId,
+        to: nextId,
+        ok: false,
+        reason: gate.reason,
+        detail: gate.detail,
+      });
+      if (gate.reason === 'blocked') {
+        this.updateAgent(nextId, {
+          status: 'idle',
+          current_task: `Pipeline halted: ${gate.detail}`,
+        });
+      }
+      return;
+    }
+
+    const upstream = collectUpstreamMarkdown(
+      (id) => this.getLatestArtifactForAgent(id),
+      pipelineIds,
+      index
+    );
     this.updateAgent(nextId, {
       config: {
         ...next.config,
-        upstream_reports: chunks.join('\n\n---\n\n'),
+        upstream_reports: upstream,
       },
       current_task: `Continuing pipeline after ${agent.name}`,
+    });
+    this.addLog(nextId, 'action', `Handoff from ${agent.name} (${upstream.length} chars upstream)`, {
+      type: 'handoff',
+      from: completedId,
+      pipeline_id: agent.config.pipeline_id,
+    });
+    slog('pipeline.handoff', {
+      from: completedId,
+      to: nextId,
+      ok: true,
+      upstreamChars: upstream.length,
+      pipelineId: agent.config.pipeline_id,
     });
     await this.startRuntime(nextId);
   }
@@ -458,38 +534,73 @@ export class DemoStore extends EventEmitter {
 
   stopRuntime(agentId: string) {
     this.runtimeAbort.add(agentId);
+    this.running.delete(agentId);
+    releaseAgentLock(agentId);
     this.updateAgent(agentId, {
       status: 'idle',
       current_task: 'Stopped by commander',
     });
-    this.addLog(agentId, 'action', 'Stopped by commander');
+    this.addLog(agentId, 'error', 'Stopped by commander', { code: 'cancelled' });
+    slog('agent.error', { agentId, code: 'cancelled' });
   }
 
   assertUsageBudget(userId: string) {
     const plan = this.getPlan(userId);
     const limits = PLAN_LIMITS[plan];
-    if (this.usage.agentRuns >= limits.maxAgentRuns) {
+    const hardRuns = Math.ceil(limits.maxAgentRuns * 1.2);
+    const hardTokens = Math.ceil(limits.maxTokensApprox * 1.2);
+    const upgrade_to =
+      plan === 'free' ? 'starter' : plan === 'starter' ? 'pro' : 'scale';
+
+    if (this.usage.agentRuns >= hardRuns) {
+      slog('plan.limit_hit', { userId, plan, metric: 'agentRuns', value: this.usage.agentRuns });
       const err = new Error(
-        `Plan limit: ${limits.label} allows ~${limits.maxAgentRuns} agent runs this period.`
-      ) as Error & { code: string };
+        `Plan limit: ${limits.label} hard cap (~${hardRuns} runs) reached.`
+      ) as Error & { code: string; upgrade_to: string };
       err.code = 'USAGE_LIMIT';
+      err.upgrade_to = upgrade_to;
       throw err;
     }
-    if (this.usage.tokensApprox >= limits.maxTokensApprox) {
+    if (this.usage.tokensApprox >= hardTokens) {
+      slog('plan.limit_hit', {
+        userId,
+        plan,
+        metric: 'tokensApprox',
+        value: this.usage.tokensApprox,
+      });
       const err = new Error(
-        `Plan limit: ${limits.label} token budget (~${limits.maxTokensApprox}) reached.`
-      ) as Error & { code: string };
+        `Plan limit: ${limits.label} hard token cap (~${hardTokens}) reached.`
+      ) as Error & { code: string; upgrade_to: string };
       err.code = 'USAGE_LIMIT';
+      err.upgrade_to = upgrade_to;
       throw err;
+    }
+    if (this.usage.agentRuns >= limits.maxAgentRuns) {
+      slog('plan.limit_soft', { userId, plan, metric: 'agentRuns', value: this.usage.agentRuns });
+    }
+    if (this.usage.tokensApprox >= limits.maxTokensApprox) {
+      slog('plan.limit_soft', {
+        userId,
+        plan,
+        metric: 'tokensApprox',
+        value: this.usage.tokensApprox,
+      });
     }
   }
 
   async startRuntime(agentId: string, humanGuidance?: string | null) {
-    if (this.running.has(agentId)) return;
-    this.runtimeAbort.delete(agentId);
     let agent = this.getAgent(agentId);
     if (!agent) return;
 
+    if (
+      agent.status === 'running' ||
+      this.running.has(agentId) ||
+      !tryAcquireAgentLock(agentId)
+    ) {
+      throw new RuntimeError('conflict', 'Agent is already running');
+    }
+
+    this.runtimeAbort.delete(agentId);
     this.assertUsageBudget(agent.user_id);
 
     // Cookie slim may drop system_prompt — restore from bundled template
@@ -508,14 +619,32 @@ export class DemoStore extends EventEmitter {
     if (agent.config.pipeline && Number(agent.config.pipeline_index) > 0) {
       const pipelineIds = (agent.config.pipeline_ids as string[]) || [];
       const index = Number(agent.config.pipeline_index ?? 0);
-      const chunks: string[] = [];
-      for (let i = 0; i < index; i++) {
-        const art = this.getLatestArtifactForAgent(pipelineIds[i]);
-        if (art) chunks.push(`### Upstream: ${art.title}\n\n${art.content_markdown}`);
+      const gate = canStartPipelineStage({
+        index,
+        pipelineIds,
+        getAgent: (id) => this.getAgent(id),
+        getArtifact: (id) => this.getLatestArtifactForAgent(id),
+      });
+      if (!gate.ok) {
+        releaseAgentLock(agentId);
+        if (gate.reason === 'blocked') {
+          this.updateAgent(agentId, {
+            status: 'idle',
+            current_task: `Pipeline halted: ${gate.detail}`,
+          });
+          this.addLog(agentId, 'error', gate.detail, { code: 'cancelled', type: 'handoff' });
+          return;
+        }
+        throw new RuntimeError('conflict', gate.detail);
       }
+      const upstream = collectUpstreamMarkdown(
+        (id) => this.getLatestArtifactForAgent(id),
+        pipelineIds,
+        index
+      );
       agent =
         this.updateAgent(agentId, {
-          config: { ...agent.config, upstream_reports: chunks.join('\n\n---\n\n') },
+          config: { ...agent.config, upstream_reports: upstream },
         }) ?? agent;
     }
 
@@ -527,15 +656,19 @@ export class DemoStore extends EventEmitter {
         await this.continuePipeline(agentId);
       }
     } catch (err) {
+      if (err instanceof RuntimeError && err.code === 'conflict') throw err;
       const message = err instanceof Error ? err.message : 'Runtime failed';
-      this.addLog(agentId, 'error', message);
+      this.addLog(agentId, 'error', message, { code: 'unknown' });
       this.updateAgent(agentId, { status: 'error', current_task: message });
+      slog('agent.error', { agentId, message });
     } finally {
       this.running.delete(agentId);
+      releaseAgentLock(agentId);
     }
   }
 
   async resumeAgent(agentId: string, humanResponse: string) {
+    slog('agent.resume', { agentId });
     await this.startRuntime(agentId, humanResponse);
   }
 

@@ -1,12 +1,13 @@
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
+import type { Metadata, Viewport } from 'next';
+import { Geist_Mono, Montserrat } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const montserrat = Montserrat({
+  variable: '--font-montserrat',
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
 });
 
 const geistMono = Geist_Mono({
@@ -14,13 +15,13 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-const instrument = Instrument_Serif({
-  variable: '--font-instrument',
-  subsets: ['latin'],
-  weight: '400',
-});
-
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -28,7 +29,11 @@ export const metadata: Metadata = {
   description:
     'The command tower for directing multiple AI agents with clear roles, realtime visibility, and low-stress escalation.',
   icons: {
-    icon: '/favicon.svg',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     title: 'Conductor — Command your AI agents',
@@ -53,9 +58,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${instrument.variable} font-sans antialiased`}
+        className={`${montserrat.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

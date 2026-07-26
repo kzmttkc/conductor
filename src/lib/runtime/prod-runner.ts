@@ -1,6 +1,17 @@
 import { executeAgentPass } from '@/lib/runtime/executor';
 import { createAwaitableDbSink } from '@/lib/runtime/db-sink';
-import { attachPipelineConfig } from '@/lib/runtime/pipeline';
+import { RuntimeError } from '@/lib/runtime/errors';
+import {
+  releaseAgentLock,
+  tryAcquireAgentLock,
+} from '@/lib/runtime/locks';
+import { slog } from '@/lib/runtime/observability';
+import {
+  attachPipelineConfig,
+  buildPipelineSummaryMarkdown,
+  canStartPipelineStage,
+  collectUpstreamMarkdown,
+} from '@/lib/runtime/pipeline';
 import * as data from '@/lib/supabase/data';
 import type { Agent, PlanTier } from '@/lib/supabase/types';
 import { getBundledTemplate } from '@/lib/templates/catalog';
@@ -21,50 +32,182 @@ export async function startProdAgent(agentId: string, humanGuidance?: string | n
   const agent = await loadAgent(agentId);
   if (!agent) return null;
 
-  const plan = await data.getPlan(agent.user_id);
-  await data.assertUsageBudget(agent.user_id, plan);
-
-  let working = agent;
-  const pipelineIds = (agent.config.pipeline_ids as string[]) || [];
-  const index = Number(agent.config.pipeline_index ?? 0);
-  if (agent.config.pipeline && index > 0 && pipelineIds.length) {
-    const arts = await data.listArtifactsForUser(agent.user_id);
-    const chunks: string[] = [];
-    for (let i = 0; i < index; i++) {
-      const art = arts.find((a) => a.agent_id === pipelineIds[i]);
-      if (art) chunks.push(`### Upstream: ${art.title}\n\n${art.content_markdown}`);
-    }
-    working = await data.updateAgent(agentId, {
-      config: {
-        ...agent.config,
-        upstream_reports: chunks.join('\n\n---\n\n'),
-      },
-    });
+  if (agent.status === 'running' || !tryAcquireAgentLock(agentId)) {
+    throw new RuntimeError('conflict', 'Agent is already running');
   }
 
-  const sink = createAwaitableDbSink(working);
   try {
-    await executeAgentPass(working, sink, { humanGuidance });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Runtime failed';
-    await data.insertLog(agentId, 'error', message);
-    await data.updateAgent(agentId, { status: 'error', current_task: message });
-  }
-  await sink.flush();
+    const plan = await data.getPlan(agent.user_id);
+    await data.assertUsageBudget(agent.user_id, plan);
 
-  const fresh = await loadAgent(agentId);
-  if (fresh?.status === 'completed') {
-    await maybeContinuePipeline(fresh);
+    let working = agent;
+    const pipelineIds = (agent.config.pipeline_ids as string[]) || [];
+    const index = Number(agent.config.pipeline_index ?? 0);
+
+    if (agent.config.pipeline && index > 0 && pipelineIds.length) {
+      const arts = await data.listArtifactsForUser(agent.user_id);
+      const getArtifact = (id: string) => arts.find((a) => a.agent_id === id) ?? null;
+      const agentsCache = new Map<string, Agent | null>();
+      const getAgent = async (id: string) => {
+        if (agentsCache.has(id)) return agentsCache.get(id)!;
+        const row = await loadAgent(id);
+        agentsCache.set(id, row);
+        return row;
+      };
+      // Sync gate using freshly loaded priors
+      const priors: Agent[] = [];
+      for (const id of pipelineIds.slice(0, index)) {
+        const p = await getAgent(id);
+        if (p) priors.push(p);
+      }
+      const gate = canStartPipelineStage({
+        index,
+        pipelineIds,
+        getAgent: (id) => priors.find((p) => p.id === id) ?? null,
+        getArtifact,
+      });
+      if (!gate.ok) {
+        if (gate.reason === 'blocked') {
+          await data.updateAgent(agentId, {
+            status: 'idle',
+            current_task: `Pipeline halted: ${gate.detail}`,
+          });
+          await data.insertLog(agentId, 'error', gate.detail, {
+            code: 'cancelled',
+            type: 'handoff',
+          });
+          return await loadAgent(agentId);
+        }
+        throw new RuntimeError('conflict', gate.detail);
+      }
+      const upstream = collectUpstreamMarkdown(getArtifact, pipelineIds, index);
+      working = await data.updateAgent(agentId, {
+        config: {
+          ...agent.config,
+          upstream_reports: upstream,
+        },
+      });
+      slog('pipeline.handoff', {
+        to: agentId,
+        ok: true,
+        upstreamChars: upstream.length,
+        pipelineId: agent.config.pipeline_id,
+      });
+    }
+
+    const sink = createAwaitableDbSink(working);
+    try {
+      await executeAgentPass(working, sink, { humanGuidance });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Runtime failed';
+      await data.insertLog(agentId, 'error', message);
+      await data.updateAgent(agentId, { status: 'error', current_task: message });
+      slog('agent.error', { agentId, message });
+    }
+    await sink.flush();
+
+    const fresh = await loadAgent(agentId);
+    if (fresh?.status === 'completed') {
+      await maybeContinuePipeline(fresh);
+    }
+    return fresh;
+  } finally {
+    releaseAgentLock(agentId);
   }
-  return fresh;
 }
 
 async function maybeContinuePipeline(completed: Agent) {
+  const pipelineIds = (completed.config.pipeline_ids as string[]) || [];
   const nextId = completed.config.pipeline_next as string | null | undefined;
-  if (!nextId || !completed.config.pipeline) return;
+
+  if (!completed.config.pipeline) return;
+
+  if (!nextId) {
+    if (pipelineIds.length > 1) {
+      const arts = await data.listArtifactsForUser(completed.user_id);
+      const crew = (
+        await Promise.all(pipelineIds.map((id) => loadAgent(id)))
+      ).filter(Boolean) as Agent[];
+      const markdown = buildPipelineSummaryMarkdown(
+        crew,
+        (id) => arts.find((a) => a.agent_id === id) ?? null
+      );
+      await data.insertArtifact({
+        agent_id: completed.id,
+        user_id: completed.user_id,
+        title: `Pipeline summary: ${String(completed.config.theme ?? completed.name)}`,
+        content_markdown: markdown,
+      });
+      await data.insertLog(completed.id, 'result', 'Pipeline summary artifact saved', {
+        type: 'handoff',
+        pipeline_id: completed.config.pipeline_id,
+      });
+    }
+    return;
+  }
+
+  const next = await loadAgent(nextId);
+  if (!next) return;
+
+  const arts = await data.listArtifactsForUser(completed.user_id);
+  const index = Number(next.config.pipeline_index ?? 0);
+  const priors = (
+    await Promise.all(pipelineIds.slice(0, index).map((id) => loadAgent(id)))
+  ).filter(Boolean) as Agent[];
+
+  const gate = canStartPipelineStage({
+    index,
+    pipelineIds,
+    getAgent: (id) => priors.find((p) => p.id === id) ?? null,
+    getArtifact: (id) => arts.find((a) => a.agent_id === id) ?? null,
+  });
+
+  if (!gate.ok) {
+    await data.insertLog(nextId, 'action', `Pipeline gated: ${gate.detail}`, {
+      type: 'handoff',
+      reason: gate.reason,
+      pipeline_id: completed.config.pipeline_id,
+    });
+    slog('pipeline.handoff', {
+      from: completed.id,
+      to: nextId,
+      ok: false,
+      reason: gate.reason,
+      detail: gate.detail,
+    });
+    if (gate.reason === 'blocked') {
+      await data.updateAgent(nextId, {
+        status: 'idle',
+        current_task: `Pipeline halted: ${gate.detail}`,
+      });
+    }
+    return;
+  }
+
+  const upstream = collectUpstreamMarkdown(
+    (id) => arts.find((a) => a.agent_id === id) ?? null,
+    pipelineIds,
+    index
+  );
   await data.updateAgent(nextId, {
     status: 'idle',
     current_task: `Continuing pipeline after ${completed.name}`,
+    config: {
+      ...next.config,
+      upstream_reports: upstream,
+    },
+  });
+  await data.insertLog(nextId, 'action', `Handoff from ${completed.name}`, {
+    type: 'handoff',
+    from: completed.id,
+    pipeline_id: completed.config.pipeline_id,
+  });
+  slog('pipeline.handoff', {
+    from: completed.id,
+    to: nextId,
+    ok: true,
+    upstreamChars: upstream.length,
+    pipelineId: completed.config.pipeline_id,
   });
   await startProdAgent(nextId);
 }
@@ -136,5 +279,6 @@ export async function resumeProdAgent(agentId: string, humanResponse: string) {
     }
     await data.updateAgent(agentId, { permissions });
   }
+  slog('agent.resume', { agentId });
   return startProdAgent(agentId, humanResponse);
 }

@@ -7,6 +7,9 @@ import {
 } from '@/lib/demo/session';
 import { DemoStore } from '@/lib/demo/store';
 import { persistStoreToResponse } from '@/lib/demo/persist';
+import { clientKey, rateLimit } from '@/lib/security/rate-limit';
+import { clipTheme } from '@/lib/security/validate';
+import { slog } from '@/lib/runtime/observability';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -26,8 +29,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const rl = rateLimit(`public-start:${clientKey(request)}`, {
+    limit: 8,
+    windowMs: 10 * 60_000,
+  });
+  if (!rl.ok) {
+    slog('rate_limit', { route: 'public-start' });
+    return NextResponse.json(
+      { error: 'Too many demo starts from this network. Try again shortly.', code: 'RATE_LIMIT' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+    );
+  }
+
   const body = await request.json().catch(() => ({}));
-  const theme = String(body.theme || 'AI agent orchestration market 2026').slice(0, 160);
+  const theme = clipTheme(body.theme || 'AI agent orchestration market 2026');
   const visitorId = createVisitorId();
   const user = visitorFromSession(visitorId)!;
 

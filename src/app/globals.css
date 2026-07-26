@@ -95,9 +95,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-display: var(--font-instrument), var(--font-geist-sans), ui-sans-serif, sans-serif;
+  --font-brand: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --color-brand: #001444;
+  --color-brand-soft: #041848;
+  --color-brand-on-dark: #9aabd0;
 }
 
 @layer base {
@@ -129,6 +133,18 @@
     font-family: var(--font-display);
   }
 
+  .font-brand {
+    font-family: var(--font-brand);
+  }
+
+  .text-brand {
+    color: var(--color-brand);
+  }
+
+  .dark .text-brand-adaptive {
+    color: var(--color-brand-on-dark);
+  }
+
   .text-balance {
     text-wrap: balance;
   }
@@ -140,5 +156,24 @@
   .urgent-ring {
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--urgent) 55%, transparent),
       0 10px 30px -18px color-mix(in oklab, var(--urgent) 70%, transparent);
+  }
+
+  /* Mobile home-indicator clearance */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Content above mobile tab bar (h-14 + safe area) */
+  .pb-tab {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .touch-target {
+    min-height: 48px;
+    min-width: 44px;
   }
 }

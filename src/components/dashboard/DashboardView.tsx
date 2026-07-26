@@ -177,19 +177,19 @@ function NeedsYouBar({
       href={escalation ? `/escalations/${escalation.id}` : '/escalations'}
       className="block rounded-xl bg-urgent text-white shadow-sm urgent-ring transition-transform duration-150 hover:scale-[1.01]"
     >
-      <div className="px-4 py-3.5 md:px-5 md:py-4 flex items-center gap-3 md:gap-4">
-        <div className="h-9 w-9 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-          <AlertTriangle className="h-4 w-4 animate-pulse" />
+      <div className="min-h-14 px-4 py-3.5 md:px-5 md:py-4 flex items-center gap-3 md:gap-4">
+        <div className="h-10 w-10 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+          <AlertTriangle className="h-5 w-5 animate-pulse" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-white/90">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/95">
             Needs You · {count}
           </p>
-          <p className="text-sm md:text-base font-medium truncate mt-0.5">
+          <p className="text-sm md:text-base font-medium line-clamp-2 mt-0.5">
             {escalation?.summary || 'An agent is waiting for your decision.'}
           </p>
         </div>
-        <span className="shrink-0 text-sm font-semibold bg-white text-urgent rounded-md px-3 py-1.5">
+        <span className="shrink-0 min-h-11 inline-flex items-center text-sm font-bold bg-white text-urgent rounded-md px-4">
           Decide
         </span>
       </div>

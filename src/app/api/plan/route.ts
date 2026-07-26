@@ -10,12 +10,22 @@ export async function GET(request: Request) {
   if (isDemoMode()) {
     return withDemoApi(request, async ({ store, user }) => {
       const plan = store.getPlan(user.id);
+      const limits = PLAN_LIMITS[plan];
+      const usage = store.usage;
       return NextResponse.json({
         plan,
-        limits: PLAN_LIMITS[plan],
+        limits,
         agentCount: store.listAgents(user.id).length,
         onboarded: store.isOnboarded(user.id),
-        usage: store.usage,
+        usage,
+        soft_limit: {
+          runs: usage.agentRuns >= limits.maxAgentRuns,
+          tokens: usage.tokensApprox >= limits.maxTokensApprox,
+        },
+        hard_cap: {
+          runs: Math.ceil(limits.maxAgentRuns * 1.2),
+          tokens: Math.ceil(limits.maxTokensApprox * 1.2),
+        },
         runtime: {
           llmEnabled: hasLlmKey(),
           provider: process.env.ANTHROPIC_API_KEY
@@ -33,12 +43,21 @@ export async function GET(request: Request) {
   const plan = await data.getPlan(user.id);
   const agents = await data.listAgentsForUser(user.id);
   const usage = await data.getUsage(user.id);
+  const limits = PLAN_LIMITS[plan];
   return NextResponse.json({
     plan,
-    limits: PLAN_LIMITS[plan],
+    limits,
     agentCount: agents.length,
     onboarded: agents.length > 0,
     usage,
+    soft_limit: {
+      runs: usage.agentRuns >= limits.maxAgentRuns,
+      tokens: usage.tokensApprox >= limits.maxTokensApprox,
+    },
+    hard_cap: {
+      runs: Math.ceil(limits.maxAgentRuns * 1.2),
+      tokens: Math.ceil(limits.maxTokensApprox * 1.2),
+    },
     runtime: {
       llmEnabled: hasLlmKey(),
       provider: process.env.ANTHROPIC_API_KEY

@@ -5,6 +5,10 @@ import { withDemoApi } from '@/lib/demo/api';
 import { inngest } from '@/lib/inngest/client';
 import * as data from '@/lib/supabase/data';
 import { resumeProdAgent } from '@/lib/runtime/prod-runner';
+import { RuntimeError } from '@/lib/runtime/errors';
+import { clientKey, rateLimit } from '@/lib/security/rate-limit';
+import { validateEscalationBody } from '@/lib/security/validate';
+import { slog } from '@/lib/runtime/observability';
 
 export async function GET(
   request: Request,
@@ -50,28 +54,53 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await request.json();
-  const action = body.action as 'approve' | 'revise' | 'cancel';
-  const humanResponse = String(body.human_response || '').trim();
-
-  if (!['approve', 'revise', 'cancel'].includes(action)) {
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  const body = await request.json().catch(() => ({}));
+  const parsed = validateEscalationBody(body);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  if (!humanResponse) {
-    return NextResponse.json({ error: 'Response required' }, { status: 400 });
-  }
+  const { action, human_response: humanResponse } = parsed;
 
   if (isDemoMode()) {
     return withDemoApi(request, async ({ store, user }) => {
+      const rl = rateLimit(`resolve:${clientKey(request, user.id)}`, {
+        limit: 30,
+        windowMs: 60_000,
+      });
+      if (!rl.ok) {
+        slog('rate_limit', { route: 'escalations', userId: user.id });
+        return NextResponse.json(
+          { error: 'Too many decisions. Try again shortly.', code: 'RATE_LIMIT' },
+          { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+        );
+      }
+
       const escalation = store.getEscalation(id);
       if (!escalation) return NextResponse.json({ error: 'Not found' }, { status: 404 });
       const agent = store.getAgent(escalation.agent_id);
       if (!agent || agent.user_id !== user.id) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
+      if (escalation.status !== 'pending') {
+        return NextResponse.json(
+          { ...escalation, next_pending_ids: store.listEscalations(user.id, 'pending').map((e) => e.id) },
+          { status: 200 }
+        );
+      }
+
       const updated = store.resolveEscalation(id, action, humanResponse);
       if (updated && action !== 'cancel') {
-        await store.resumeAgent(updated.agent_id, humanResponse);
+        try {
+          await store.resumeAgent(updated.agent_id, humanResponse);
+        } catch (e) {
+          if (e instanceof RuntimeError && e.code === 'conflict') {
+            return NextResponse.json(
+              { error: e.message, code: 'CONFLICT', ...updated },
+              { status: 409 }
+            );
+          }
+          throw e;
+        }
         try {
           await inngest.send({
             name: 'conductor/escalation.resolved',
@@ -93,6 +122,19 @@ export async function POST(
 
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const rl = rateLimit(`resolve:${clientKey(request, user.id)}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!rl.ok) {
+    slog('rate_limit', { route: 'escalations', userId: user.id });
+    return NextResponse.json(
+      { error: 'Too many decisions. Try again shortly.', code: 'RATE_LIMIT' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
+    );
+  }
+
   const supabase = await (await import('@/lib/supabase/server')).createClient();
   const { data: existing } = await supabase
     .from('escalations')
@@ -103,7 +145,17 @@ export async function POST(
   const agent = await data.getAgentForUser(user.id, existing.agent_id);
   if (!agent) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  if (existing.status !== 'pending') {
+    const remaining = (await data.listPendingEscalations(user.id)).map((e) => e.id);
+    return NextResponse.json({ ...existing, next_pending_ids: remaining });
+  }
+
   const updated = await data.resolveEscalationRow(id, action, humanResponse);
+  if (!updated) {
+    const remaining = (await data.listPendingEscalations(user.id)).map((e) => e.id);
+    return NextResponse.json({ ...existing, next_pending_ids: remaining });
+  }
+
   if (action === 'cancel') {
     await data.updateAgent(agent.id, {
       status: 'idle',
@@ -116,7 +168,17 @@ export async function POST(
       'action',
       `Human ${action === 'approve' ? 'approved' : 'revised'}: ${humanResponse}`
     );
-    await resumeProdAgent(agent.id, humanResponse);
+    try {
+      await resumeProdAgent(agent.id, humanResponse);
+    } catch (e) {
+      if (e instanceof RuntimeError && e.code === 'conflict') {
+        return NextResponse.json(
+          { error: e.message, code: 'CONFLICT', ...updated },
+          { status: 409 }
+        );
+      }
+      throw e;
+    }
   }
 
   const remaining = (await data.listPendingEscalations(user.id)).map((e) => e.id);

@@ -59,24 +59,38 @@ export async function assertAgentCapacity(userId: string, needed: number, plan: 
   }
 }
 
+/** Soft = warn at 100%. Hard = reject at 120% of plan budget. */
 export async function assertUsageBudget(userId: string, plan: PlanTier) {
+  const { slog } = await import('@/lib/runtime/observability');
   const usage = await getUsage(userId);
   const limits = PLAN_LIMITS[plan];
-  if (usage.agentRuns >= limits.maxAgentRuns) {
+  const hardRuns = Math.ceil(limits.maxAgentRuns * 1.2);
+  const hardTokens = Math.ceil(limits.maxTokensApprox * 1.2);
+  const upgrade_to = plan === 'free' ? 'starter' : plan === 'starter' ? 'pro' : 'scale';
+
+  if (usage.agentRuns >= hardRuns) {
+    slog('plan.limit_hit', { userId, plan, metric: 'agentRuns', value: usage.agentRuns });
     const err = new Error(
-      `Plan limit: ${limits.label} allows ~${limits.maxAgentRuns} agent runs this period.`
+      `Plan limit: ${limits.label} hard cap (~${hardRuns} runs) reached.`
     ) as Error & { code: string; upgrade_to: string };
     err.code = 'USAGE_LIMIT';
-    err.upgrade_to = plan === 'free' ? 'starter' : plan === 'starter' ? 'pro' : 'scale';
+    err.upgrade_to = upgrade_to;
     throw err;
   }
-  if (usage.tokensApprox >= limits.maxTokensApprox) {
+  if (usage.tokensApprox >= hardTokens) {
+    slog('plan.limit_hit', { userId, plan, metric: 'tokensApprox', value: usage.tokensApprox });
     const err = new Error(
-      `Plan limit: ${limits.label} token budget (~${limits.maxTokensApprox}) reached.`
+      `Plan limit: ${limits.label} hard token cap (~${hardTokens}) reached.`
     ) as Error & { code: string; upgrade_to: string };
     err.code = 'USAGE_LIMIT';
-    err.upgrade_to = plan === 'free' ? 'starter' : plan === 'starter' ? 'pro' : 'scale';
+    err.upgrade_to = upgrade_to;
     throw err;
+  }
+  if (usage.agentRuns >= limits.maxAgentRuns) {
+    slog('plan.limit_soft', { userId, plan, metric: 'agentRuns', value: usage.agentRuns });
+  }
+  if (usage.tokensApprox >= limits.maxTokensApprox) {
+    slog('plan.limit_soft', { userId, plan, metric: 'tokensApprox', value: usage.tokensApprox });
   }
 }
 
@@ -277,14 +291,15 @@ export async function insertArtifact(input: {
   content_markdown: string;
   kind?: Artifact['kind'];
 }) {
+  const { sanitizeMarkdown, clipText } = await import('@/lib/security/validate');
   const supabase = await db();
   const { data, error } = await supabase
     .from('artifacts')
     .insert({
       agent_id: input.agent_id,
       user_id: input.user_id,
-      title: input.title,
-      content_markdown: input.content_markdown,
+      title: clipText(input.title, 200),
+      content_markdown: sanitizeMarkdown(input.content_markdown),
       kind: input.kind ?? 'report',
     })
     .select('*')
@@ -310,9 +325,10 @@ export async function resolveEscalationRow(
     .eq('id', id)
     .eq('status', 'pending')
     .select('*')
-    .single();
+    .maybeSingle();
   if (error) throw error;
-  return data as Escalation;
+  // null = already resolved (idempotent no-op)
+  return (data as Escalation | null) ?? null;
 }
 
 export async function deleteAgent(userId: string, agentId: string) {
