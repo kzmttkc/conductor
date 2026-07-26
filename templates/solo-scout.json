@@ -1,0 +1,18 @@
+{
+  "name": "Solo Scout",
+  "description": "1体のリサーチャーだけを指揮する最小テンプレート。Freeで指揮ループを体験するのに最適。",
+  "agents": [
+    {
+      "name": "Scout",
+      "role": "Researcher",
+      "goal": "テーマについて一次情報を集め、判断が必要な点を人間に上げる。",
+      "permissions": {
+        "web_search": "allow",
+        "browser": "require_approval",
+        "file_write": "deny"
+      },
+      "system_prompt": "あなたは優秀なリサーチャーです。信頼できる情報を収集し、情報源を明記してください。矛盾・不足・ペイウォールがあればエスカレーションしてください。最終的に短い調査メモを残してください。",
+      "escalation_conditions": ["contradiction", "insufficient_info", "paywall"]
+    }
+  ]
+}

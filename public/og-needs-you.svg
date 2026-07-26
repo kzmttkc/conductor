@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#111111"/>
+  <rect x="0" y="0" width="1200" height="88" fill="#D64545"/>
+  <text x="48" y="54" fill="#FFFFFF" font-family="Georgia, serif" font-size="28" font-weight="600">NEEDS YOU · 1 PENDING</text>
+  <rect x="980" y="24" width="160" height="40" rx="8" fill="#FFFFFF"/>
+  <text x="1060" y="50" fill="#D64545" font-family="ui-sans-serif, system-ui" font-size="18" font-weight="700" text-anchor="middle">Decide</text>
+  <text x="64" y="180" fill="#A3A3A3" font-family="ui-sans-serif, system-ui" font-size="22">Scout · Researcher</text>
+  <text x="64" y="270" fill="#F5F5F5" font-family="Georgia, serif" font-size="48">Sources conflict on market size.</text>
+  <text x="64" y="340" fill="#F5F5F5" font-family="Georgia, serif" font-size="48">Which figure is primary?</text>
+  <rect x="64" y="420" width="720" height="56" rx="12" fill="#FFFFFF"/>
+  <text x="88" y="455" fill="#111111" font-family="ui-sans-serif, system-ui" font-size="22">1  Approve and continue</text>
+  <text x="64" y="580" fill="#6B6B66" font-family="ui-sans-serif, system-ui" font-size="24">Conductor  command your AI agents</text>
+</svg>

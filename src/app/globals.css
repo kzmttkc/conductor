@@ -1,0 +1,144 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #f7f7f5;
+  --foreground: #141414;
+  --card: #ffffff;
+  --card-foreground: #141414;
+  --popover: #ffffff;
+  --popover-foreground: #141414;
+  --primary: #141414;
+  --primary-foreground: #fafafa;
+  --secondary: #ececea;
+  --secondary-foreground: #1a1a1a;
+  --muted: #efefed;
+  --muted-foreground: #6b6b66;
+  --accent: #e8f0ea;
+  --accent-foreground: #16341f;
+  --destructive: #d64545;
+  --destructive-foreground: #fff;
+  --border: #e4e4e0;
+  --input: #e4e4e0;
+  --ring: #2f6f4e;
+  --success: #2f6f4e;
+  --warning: #c47b1a;
+  --urgent: #d64545;
+  --radius: 0.625rem;
+  --sidebar: #f1f1ee;
+  --sidebar-foreground: #141414;
+  --sidebar-border: #e4e4e0;
+  --chart-1: #2f6f4e;
+  --chart-2: #3b6ea5;
+  --chart-3: #c47b1a;
+  --chart-4: #d64545;
+  --chart-5: #6b6b66;
+}
+
+.dark {
+  --background: #0e0f10;
+  --foreground: #f2f2f0;
+  --card: #161719;
+  --card-foreground: #f2f2f0;
+  --popover: #161719;
+  --popover-foreground: #f2f2f0;
+  --primary: #f2f2f0;
+  --primary-foreground: #111213;
+  --secondary: #222427;
+  --secondary-foreground: #f2f2f0;
+  --muted: #1c1e21;
+  --muted-foreground: #9a9a94;
+  --accent: #1a2a20;
+  --accent-foreground: #c7e4d0;
+  --destructive: #ef5b5b;
+  --destructive-foreground: #fff;
+  --border: #2a2c30;
+  --input: #2a2c30;
+  --ring: #5ea37a;
+  --success: #5ea37a;
+  --warning: #e0a04a;
+  --urgent: #ef5b5b;
+  --sidebar: #121314;
+  --sidebar-foreground: #f2f2f0;
+  --sidebar-border: #2a2c30;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-urgent: var(--urgent);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-instrument), var(--font-geist-sans), ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, rgba(47, 111, 78, 0.08), transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, rgba(59, 110, 165, 0.06), transparent 50%);
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(1000px 500px at 0% -10%, rgba(94, 163, 122, 0.1), transparent 55%),
+      radial-gradient(800px 400px at 100% 0%, rgba(59, 110, 165, 0.08), transparent 50%);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .surface {
+    @apply bg-card/80 backdrop-blur-sm border border-border;
+  }
+
+  .urgent-ring {
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--urgent) 55%, transparent),
+      0 10px 30px -18px color-mix(in oklab, var(--urgent) 70%, transparent);
+  }
+}

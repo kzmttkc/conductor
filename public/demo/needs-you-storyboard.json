@@ -1,0 +1,25 @@
+{
+  "capturedAt": "2026-07-25T23:53:06.192Z",
+  "base": "http://127.0.0.1:3000",
+  "escalation": {
+    "id": "9b2f9eb2-4897-4e19-bb7d-cd9cd6df30ae",
+    "summary": "Sources conflict or are incomplete for “AI agent orchestration market 2026”. One cluster implies a larger market; another is more conservative. Which framing should I treat as primary?",
+    "options": [
+      "Approve and continue with current direction",
+      "Narrow scope to primary competitors only",
+      "Pause and request deeper primary sources"
+    ]
+  },
+  "urls": {
+    "demo": "http://127.0.0.1:3000/demo",
+    "moment": "http://127.0.0.1:3000/demo/moment",
+    "decide": "http://127.0.0.1:3000/escalations/9b2f9eb2-4897-4e19-bb7d-cd9cd6df30ae",
+    "dashboard": "http://127.0.0.1:3000/dashboard?tour=1"
+  },
+  "recordingTips": [
+    "Record 1280x720 or 1080p, 15–30 seconds",
+    "Start on /demo → click Start → wait for red banner",
+    "Click Decide → press A → show resume",
+    "Caption: “When agents need judgment, Conductor makes it a 3-second decision.”"
+  ]
+}
