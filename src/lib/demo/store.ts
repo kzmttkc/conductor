@@ -31,7 +31,7 @@ type StoreEvent =
   | { type: 'agent_logs'; payload: AgentLog; event: 'INSERT' }
   | { type: 'artifacts'; payload: Artifact; event: 'INSERT' };
 
-class DemoStore extends EventEmitter {
+export class DemoStore extends EventEmitter {
   agents: Agent[] = [];
   logs: AgentLog[] = [];
   escalations: Escalation[] = [];
@@ -304,7 +304,7 @@ class DemoStore extends EventEmitter {
         'action',
         `Human ${action === 'approve' ? 'approved' : 'revised'}: ${humanResponse}`
       );
-      void this.resumeAgent(escalation.agent_id, humanResponse);
+      // Caller should await resumeAgent (serverless-safe).
     }
 
     return updated;
@@ -360,7 +360,7 @@ class DemoStore extends EventEmitter {
     const template = this.getTemplate(templateId);
     if (!template) throw new Error('Template not found');
 
-    const created = template.agent_definitions.map((def) =>
+    return template.agent_definitions.map((def) =>
       this.createAgent({
         user_id: userId,
         name: def.name,
@@ -374,15 +374,15 @@ class DemoStore extends EventEmitter {
           theme,
         },
         template_id: template.id,
-        status: 'running',
+        status: 'idle',
       })
     );
+  }
 
-    for (const agent of created) {
-      void this.startRuntime(agent.id);
-    }
-
-    return created;
+  async launchTemplateAndRun(userId: string, templateId: string, theme: string) {
+    const created = this.launchTemplate(userId, templateId, theme);
+    await Promise.all(created.map((agent) => this.startRuntime(agent.id)));
+    return created.map((a) => this.getAgent(a.id)!);
   }
 
   private makeSink(agentId: string) {
@@ -468,9 +468,9 @@ class DemoStore extends EventEmitter {
     await this.startRuntime(agentId, humanResponse);
   }
 
-  recoverAgent(agentId: string) {
+  async recoverAgent(agentId: string) {
     this.addLog(agentId, 'action', 'Commander requested recovery / retry');
-    void this.startRuntime(agentId, 'Retry after error. Prefer safe sources.');
+    await this.startRuntime(agentId, 'Retry after error. Prefer safe sources.');
   }
 
   markOnboarded(userId: string) {

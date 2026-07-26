@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { AppShell } from '@/components/layout/AppShell';
 import { isDemoMode } from '@/lib/config';
-import { getDemoStore } from '@/lib/demo/store';
+import { getStoreFromCookies } from '@/lib/demo/persist';
 
 export default async function AppLayout({
   children,
@@ -14,7 +14,8 @@ export default async function AppLayout({
 
   let pendingCount = 0;
   if (isDemoMode()) {
-    pendingCount = getDemoStore().listEscalations(user.id, 'pending').length;
+    const store = await getStoreFromCookies();
+    pendingCount = store.listEscalations(user.id, 'pending').length;
   }
 
   return (

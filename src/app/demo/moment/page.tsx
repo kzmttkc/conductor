@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { NeedsYouMoment } from '@/components/marketing/NeedsYouMoment';
+import { ShareButtons } from '@/components/marketing/ShareButtons';
 
 const title = 'Needs You — Conductor escalation moment';
 const description =
   'The core of Conductor: an agent pauses and asks for human judgment in under 3 seconds.';
+const ogImage = '/og-needs-you.png';
 
 export const metadata: Metadata = {
   title,
@@ -14,13 +16,13 @@ export const metadata: Metadata = {
     title,
     description,
     type: 'website',
-    images: [{ url: '/og-needs-you.svg', width: 1200, height: 630, alt: title }],
+    images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
   },
   twitter: {
     card: 'summary_large_image',
     title,
     description,
-    images: ['/og-needs-you.svg'],
+    images: [ogImage],
   },
 };
 
@@ -59,6 +61,10 @@ export default function DemoMomentPage() {
             /demo/needs-you.gif
           </a>
         </p>
+
+        <div className="mt-8">
+          <ShareButtons path="/demo/moment" />
+        </div>
 
         <div className="mt-10 flex flex-wrap gap-3">
           <Button asChild size="lg" className="bg-white text-black hover:bg-white/90">

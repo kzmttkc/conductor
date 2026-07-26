@@ -36,40 +36,50 @@ export function useAgents(userId: string | null) {
       };
       void boot();
 
-      const es = new EventSource('/api/demo/events');
-      es.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data) as {
-            type: string;
-            event: string;
-            payload: Agent | { id: string };
-          };
-          if (msg.type !== 'agents') return;
-          if (msg.event === 'INSERT') {
-            setAgents((prev) => [msg.payload as Agent, ...prev.filter((a) => a.id !== (msg.payload as Agent).id)]);
+      // Cookie-backed demo on Vercel: SSE cannot share process memory — poll instead.
+      const pollMs = process.env.NEXT_PUBLIC_VERCEL_ENV ? 2000 : 8000;
+      const es =
+        process.env.NEXT_PUBLIC_VERCEL_ENV ? null : new EventSource('/api/demo/events');
+      if (es) {
+        es.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data) as {
+              type: string;
+              event: string;
+              payload: Agent | { id: string };
+            };
+            if (msg.type !== 'agents') return;
+            if (msg.event === 'INSERT') {
+              setAgents((prev) => [
+                msg.payload as Agent,
+                ...prev.filter((a) => a.id !== (msg.payload as Agent).id),
+              ]);
+            }
+            if (msg.event === 'UPDATE') {
+              setAgents((prev) =>
+                prev.map((a) =>
+                  a.id === (msg.payload as Agent).id ? (msg.payload as Agent) : a
+                )
+              );
+            }
+            if (msg.event === 'DELETE') {
+              setAgents((prev) =>
+                prev.filter((a) => a.id !== (msg.payload as { id: string }).id)
+              );
+            }
+          } catch {
+            // ignore malformed events
           }
-          if (msg.event === 'UPDATE') {
-            setAgents((prev) =>
-              prev.map((a) =>
-                a.id === (msg.payload as Agent).id ? (msg.payload as Agent) : a
-              )
-            );
-          }
-          if (msg.event === 'DELETE') {
-            setAgents((prev) => prev.filter((a) => a.id !== (msg.payload as { id: string }).id));
-          }
-        } catch {
-          // ignore malformed events
-        }
-      };
+        };
+      }
 
       const poll = setInterval(() => {
         void fetchDemo();
-      }, 8000);
+      }, pollMs);
 
       return () => {
         cancelled = true;
-        es.close();
+        es?.close();
         clearInterval(poll);
       };
     }

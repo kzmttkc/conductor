@@ -9,13 +9,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Conductor — Command your AI agents',
     description: 'Try the live demo — feel the Needs You moment in under a minute.',
-    images: [{ url: '/og-needs-you.svg', width: 1200, height: 630 }],
+    images: [{ url: '/og-needs-you.png', width: 1200, height: 630 }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Conductor — Command your AI agents',
     description: 'Try the live demo — feel the Needs You moment in under a minute.',
-    images: ['/og-needs-you.svg'],
+    images: ['/og-needs-you.png'],
   },
 };
 

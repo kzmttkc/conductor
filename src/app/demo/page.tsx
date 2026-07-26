@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ShareButtons } from '@/components/marketing/ShareButtons';
 
 export default function PublicDemoPage() {
   const router = useRouter();
@@ -76,6 +77,14 @@ export default function PublicDemoPage() {
             <Share2 className="h-4 w-4" />
             Copy /demo link
           </Button>
+        </div>
+
+        <div className="mt-6">
+          <ShareButtons
+            tone="light"
+            path="/demo"
+            text="One-click Conductor demo — launch Scout, hit Needs You, decide in 3 seconds:"
+          />
         </div>
 
         <p className="text-xs text-muted-foreground mt-6 leading-relaxed">
