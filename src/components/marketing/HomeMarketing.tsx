@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { BrandWordmark } from '@/components/brand';
@@ -25,16 +26,47 @@ export function HomeMarketing() {
           <p className="mt-8 text-lg md:text-xl text-[#6b6b66] max-w-xl text-balance">
             {t('brand.tagline')} {t('brand.outcome')}
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3">
-            <Button asChild size="lg" className="min-h-12 w-full sm:w-auto">
+          <p className="mt-4 text-sm md:text-[15px] text-[#6b6b66] max-w-xl leading-relaxed text-balance">
+            {t('home.clarity')}
+          </p>
+          <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-3">
+            <Button
+              asChild
+              size="lg"
+              className="min-h-12 w-full sm:w-auto bg-[#141414] text-[#fafafa] hover:bg-[#141414]/90"
+            >
               <Link href="/demo">{t('home.ctaDemo')}</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="min-h-12 w-full sm:w-auto">
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="min-h-12 w-full sm:w-auto border-[#c8c8c2] bg-transparent text-[#141414] hover:bg-[#141414]/5"
+            >
               <Link href="/demo/moment">{t('home.ctaMoment')}</Link>
             </Button>
           </div>
           <p className="mt-4 text-sm text-[#6b6b66]">{t('home.shareHint')}</p>
         </section>
+
+        <figure className="mt-12 sm:mt-16 max-w-xl mx-auto md:mx-0">
+          <Link
+            href="/demo/moment"
+            className="block overflow-hidden rounded-xl border border-[#e4e4e0] bg-white shadow-[0_8px_24px_-12px_rgba(20,20,20,0.18)] transition-transform duration-150 hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#001444]/40"
+          >
+            <Image
+              src="/demo/needs-you-moment.png"
+              alt={t('home.momentCaption')}
+              width={960}
+              height={720}
+              className="w-full h-auto"
+              priority
+            />
+          </Link>
+          <figcaption className="mt-3 text-xs text-[#6b6b66] text-center md:text-left">
+            {t('home.momentCaption')}
+          </figcaption>
+        </figure>
 
         <section className="mt-20 sm:mt-28 grid gap-8 md:grid-cols-3">
           {[

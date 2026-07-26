@@ -1,15 +1,15 @@
 export const en = {
   brand: {
     name: 'CONDUCTOR',
-    tagline: 'One human. A crew of agents.',
-    outcome: 'Your agents work; you only decide the hard calls.',
+    tagline: 'One person. A crew of agents.',
+    outcome: 'They work; you decide the hard calls.',
   },
   nav: {
     needsYou: 'Needs You',
     needsYouShort: 'Needs',
     signIn: 'Sign in',
     tryDemo: 'Try live demo',
-    openDashboard: 'Open Dashboard',
+    openDashboard: 'Open dashboard',
     home: 'Home',
     agents: 'Agents',
     results: 'Results',
@@ -36,7 +36,10 @@ export const en = {
     aiDisclaimer: 'AI outputs may be incorrect. You remain responsible for decisions.',
   },
   home: {
-    ctaDemo: 'Try live demo — no signup',
+    clarity:
+      'When an agent needs judgment, it stops and asks you. You decide in seconds — then it resumes.',
+    momentCaption: 'The Needs You moment — the core of Conductor',
+    ctaDemo: 'Try live demo — no account needed',
     ctaMoment: 'See the Needs You moment',
     shareHint: 'Share the live demo link anytime.',
     rolesTitle: 'Roles & permissions',
@@ -47,7 +50,7 @@ export const en = {
     hitlBody: 'When judgment is needed, decide in seconds — then resume.',
     pricingTitle: 'Pricing',
     pricingBody:
-      'Start free. Upgrade when your team grows. Limits apply to agents and approximate monthly runs.',
+      'Start free. Upgrade when your crew grows. Limits apply to agents and monthly runs.',
   },
   demo: {
     title: 'Try the workspace',
@@ -100,7 +103,7 @@ export const en = {
   app: {
     liveOverview: 'Live overview',
     dashboardBlurb: 'See who is working, who needs you, and what is ready to read.',
-    launchTemplate: 'Launch template',
+    launchTemplate: 'Launch a template',
     resolveNeeds: 'Resolve needs',
     decide: 'Decide',
     needsPending: 'Needs you · {n} pending',
@@ -136,7 +139,8 @@ export const en = {
     pickDirection: 'Pick a direction. The agent waits until you decide.',
     themeLabel: 'Theme · {theme}',
     openAgent: 'Open {name} →',
-    hintShortcuts: 'Same shortcuts work from anywhere on this page — no need to click into a field first.',
+    hintShortcuts:
+      'Same shortcuts work anywhere on this page — no need to click into a field first.',
     gotIt: 'Got it',
     contextTimeline: 'Context & timeline',
     events: '{n} events',
@@ -319,7 +323,8 @@ export const en = {
     loadError: 'Could not load reports',
     loadErrorHint: 'Check your connection and try again.',
     emptyTitle: 'No reports yet',
-    emptyBody: 'Launch a team and resolve Needs You — reports appear on completion.',
+    emptyBody:
+      'Launch a template and clear Needs You — reports show up when a run finishes.',
     launch: 'Launch a template',
     copy: 'Copy report',
     copied: 'Report copied',
@@ -485,12 +490,12 @@ export const en = {
   meta: {
     title: 'Conductor — Direct your AI agents',
     description:
-      'Direct multiple AI agents with clear roles, realtime visibility, and low-stress human decisions.',
-    ogDescription: 'Try the live demo — feel the Needs You moment in under a minute.',
+      'One person. A crew of agents. They work; you decide the hard calls.',
+    ogDescription: 'Try the live demo — see the Needs You moment in under a minute.',
     homeDescription:
-      'One human. A crew of agents. Clear authority, full visibility, and decisions that respect your attention.',
+      'One person. A crew of agents. They work; you decide the hard calls.',
     momentTitle: 'Needs You moment — Conductor',
-    momentDescription: 'The shareable Needs You decision frame — try the live demo.',
+    momentDescription: 'The Needs You decision frame — try the live demo.',
   },
   dashboard: {
     dragReorder: 'Drag to reorder',
@@ -542,7 +547,7 @@ export const en = {
     perMo: '/mo',
     agents: '{n} agents',
     runs: '~{n} runs / period',
-    ctaFree: 'Try demo',
+    ctaFree: 'Try live demo',
     ctaPaid: 'Get started',
   },
   common: {
@@ -557,7 +562,7 @@ export const en = {
     summaryTool:
       'Agent requests approval to use “{tool}”. Allow this tool call?',
     summaryVerify:
-      'Unable to fully verify a key claim about “{theme}” from open sources. Proceed with a confidence caveat, or block until a primary source is found?',
+      'Unable to fully verify a key claim about “{theme}” from open sources. Continue with a confidence caveat, or wait for a primary source?',
     summaryPriority:
       'Priority is ambiguous for “{theme}”. Should the deliverable lead with competitive threats or growth opportunities?',
     summaryConflict:
@@ -583,11 +588,11 @@ export const en = {
     agentTheme: '{name}: {theme}',
   },
   errors: {
-    planAgents: 'Plan limit: {plan} allows {limit} agents.',
+    planAgents: 'You’ve reached the agent limit on {plan} ({limit} agents).',
     planAgentsCrew:
-      'Plan limit: {plan} allows {limit} agents. This team needs {needed} (you have {current}).',
-    usageRuns: 'Plan limit: {plan} hard cap (~{n} runs) reached.',
-    usageTokens: 'Plan limit: {plan} hard token cap (~{n}) reached.',
+      'You’ve reached the agent limit on {plan}. This crew needs {needed}; you have {current} of {limit}.',
+    usageRuns: 'You’ve used the run allowance for this period on {plan} (~{n}).',
+    usageTokens: 'You’ve used the AI usage allowance for this period on {plan} (~{n}).',
     upgradeFailed: 'Upgrade failed',
     upgradedTo: 'Upgraded to {plan}',
     upgradeToPrice: 'Upgrade to {plan} (${price}/mo)',

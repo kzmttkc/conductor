@@ -82,9 +82,9 @@ Unified APIs (demo + prod): `/api/agents`, `/api/escalations`, `/api/artifacts`,
 | Plan    | Price  | Agents | ~Runs / mo |
 |---------|--------|--------|------------|
 | Free    | $0     | 2      | 40         |
-| Starter | $29/mo | 5      | 300        |
-| Pro     | $79/mo | 15     | 1500       |
-| Scale   | $149+  | 50     | 10000      |
+| Starter | $29/mo | 5      | 200        |
+| Pro     | $79/mo | 15     | 600        |
+| Scale   | $149/mo| 50     | 2000       |
 
 ## Master package
 
