@@ -1,4 +1,4 @@
-import { webSearch } from './web-search';
+import { webSearch, WebSearchFailedError } from './web-search';
 import { hasLlmKey, runLlmAgentPass } from './llm';
 import type { Agent, PermissionLevel, ToolName } from '@/lib/supabase/types';
 import {
@@ -98,6 +98,48 @@ async function runToolWithPermission(
     sink.log('result', out.slice(0, 1200), { tool });
     return 'ok';
   } catch (err) {
+    if (err instanceof WebSearchFailedError && tool === 'web_search') {
+      const theme = String(agent.config.theme ?? agent.current_task ?? 'mission');
+      sink.log('error', err.message, {
+        code: 'search_failed',
+        tool,
+        reason: err.reason,
+      });
+      slog('agent.tool_call', {
+        agentId: agent.id,
+        tool,
+        result: 'search_failed',
+        reason: err.reason,
+      });
+      sink.escalate(
+        `Web search failed for “${theme}”. How should we proceed?`,
+        [
+          'Retry web search',
+          'Check tool permissions and continue without search',
+          'Change the research theme',
+        ],
+        {
+          tool,
+          reason: 'search_failed',
+          code: 'search_failed',
+          searchReason: err.reason,
+          summaryKey: 'escalate.summarySearchFailed',
+          summaryParams: { theme },
+          locale: resolveAgentLocale(agent),
+          optionKeys: [
+            'escalate.optionRetrySearch',
+            'escalate.optionSkipSearch',
+            'escalate.optionChangeTheme',
+          ],
+        }
+      );
+      slog('agent.escalate', {
+        agentId: agent.id,
+        tool,
+        reason: 'search_failed',
+      });
+      return 'escalated';
+    }
     const message = err instanceof Error ? err.message : 'Tool failed';
     sink.log('error', message, { code: 'tool_error', tool });
     throw new RuntimeError('tool_error', message);

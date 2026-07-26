@@ -1,10 +1,20 @@
 /** Input length / shape guards for public and authenticated APIs. */
 
-export function clipTheme(raw: unknown, max = 160): string {
+export const LIMITS = {
+  theme: 200,
+  guidance: 4000,
+  summary: 2000,
+} as const;
+
+export function clipTheme(raw: unknown, max = LIMITS.theme): string {
   return String(raw ?? '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
     .trim()
     .slice(0, max);
+}
+
+export function clipSummary(raw: unknown, max = LIMITS.summary): string {
+  return clipText(raw, max);
 }
 
 export function clipText(raw: unknown, max: number): string {
@@ -27,7 +37,7 @@ export function validateEscalationBody(body: {
   if (!['approve', 'revise', 'cancel'].includes(action)) {
     return { ok: false, error: 'Invalid action' };
   }
-  const human_response = clipText(body.human_response, 4000);
+  const human_response = clipText(body.human_response, LIMITS.guidance);
   if (!human_response) {
     return { ok: false, error: 'Response required' };
   }

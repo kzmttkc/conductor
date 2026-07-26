@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, stepCountIs, streamText, tool } from 'ai';
 import { z } from 'zod';
-import { webSearch, type SearchResult } from './web-search';
+import { webSearch, WebSearchFailedError, type SearchResult } from './web-search';
 import type { Locale } from '@/i18n/types';
 import { DEFAULT_LOCALE } from '@/i18n/types';
 import { languageInstruction, rt } from '@/lib/runtime/locale';
@@ -172,16 +172,47 @@ export async function runLlmAgentPass(input: {
             }),
             execute: async ({ query }) => {
               input.onEvent?.({ type: 'tool_call', tool: 'web_search', input: { query } });
-              const results = await webSearch(query, 5, {
-                locale,
-                preferJaSources: input.preferJaSources,
-              });
-              searchFindings.push(...results);
-              input.onEvent?.({ type: 'tool_result', tool: 'web_search', output: results });
-              return {
-                results,
-                note: rt(locale, 'search.llmResultNote'),
-              };
+              try {
+                const results = await webSearch(query, 5, {
+                  locale,
+                  preferJaSources: input.preferJaSources,
+                });
+                searchFindings.push(...results);
+                input.onEvent?.({ type: 'tool_result', tool: 'web_search', output: results });
+                return {
+                  results,
+                  note: rt(locale, 'search.llmResultNote'),
+                };
+              } catch (err) {
+                if (err instanceof WebSearchFailedError) {
+                  escalated = {
+                    summary: `Web search failed for “${theme}”. How should we proceed?`,
+                    options: [
+                      'Retry web search',
+                      'Check tool permissions and continue without search',
+                      'Change the research theme',
+                    ],
+                    summaryKey: 'escalate.summarySearchFailed',
+                    summaryParams: { theme },
+                    optionKeys: [
+                      'escalate.optionRetrySearch',
+                      'escalate.optionSkipSearch',
+                      'escalate.optionChangeTheme',
+                    ],
+                  };
+                  input.onEvent?.({
+                    type: 'escalate',
+                    summary: escalated.summary,
+                    options: escalated.options,
+                  });
+                  return {
+                    ok: false,
+                    failed: true,
+                    reason: err.reason,
+                  };
+                }
+                throw err;
+              }
             },
           }),
         }

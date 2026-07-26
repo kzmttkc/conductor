@@ -12,6 +12,7 @@ import {
   formatEscalationStatus,
   formatEscalationSummary,
 } from '@/i18n/format-content';
+import { dedupePendingEscalations } from '@/lib/escalations/dedupe';
 
 export default function EscalationsPage() {
   const [items, setItems] = useState<Escalation[]>([]);
@@ -53,7 +54,7 @@ export default function EscalationsPage() {
     };
   }, [t]);
 
-  const pending = items.filter((e) => e.status === 'pending');
+  const pending = dedupePendingEscalations(items);
   const resolved = items.filter((e) => e.status !== 'pending');
 
   return (

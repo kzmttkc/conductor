@@ -33,6 +33,8 @@ import {
 } from '@/lib/templates/ja-overlays';
 import { readAgentLabelsJa } from '@/i18n/agent-labels-client';
 
+const TIP_KEY = 'conductor-tip-escalation-dismissed';
+
 export function EscalationDecision({
   escalation,
   agent,
@@ -53,22 +55,11 @@ export function EscalationDecision({
     null
   );
   const [resuming, setResuming] = useState(false);
-  const [hintVisible, setHintVisible] = useState(false);
   const [confirmAbort, setConfirmAbort] = useState(false);
   const [customMap, setCustomMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setCustomMap(readAgentLabelsJa());
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem('conductor-esc-hint-seen')) {
-        setHintVisible(true);
-      }
-    } catch {
-      // ignore
-    }
   }, []);
 
   const displayName = agentLabel(agent.name, locale, {
@@ -91,8 +82,6 @@ export function EscalationDecision({
     const idx = selectedOption ? escalation.options.indexOf(selectedOption) : -1;
     const label =
       idx >= 0 ? (displayOptions[idx] ?? selectedOption) : selectedOption;
-    // Keep canonical EN option when it is a tool-allow chip so resume matchers still work;
-    // otherwise prefer the localized label for activity / guidance.
     const isToolAllow =
       !!selectedOption && /^Allow .+ for this (?:mission|run)$/i.test(selectedOption);
     const optionPart = isToolAllow ? selectedOption : label;
@@ -152,32 +141,40 @@ export function EscalationDecision({
     if (escalation.status !== 'pending') return;
 
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = Number(e.key) - 1;
+        if (escalation.options[idx]) {
+          e.preventDefault();
+          setSelectedOption(escalation.options[idx]);
+        }
+        return;
+      }
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        void submit('approve');
+        return;
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        void submit('revise');
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setConfirmAbort(true);
+        return;
+      }
+      // Enter only when not typing free guidance
       const target = e.target as HTMLElement | null;
       const typing =
         target?.tagName === 'TEXTAREA' ||
         target?.tagName === 'INPUT' ||
         target?.isContentEditable;
-      if (typing) return;
-
-      if (e.key >= '1' && e.key <= '9') {
-        const idx = Number(e.key) - 1;
-        if (escalation.options[idx]) {
-          setSelectedOption(escalation.options[idx]);
-        }
-      }
-      if ((e.key === 'Enter' || e.key === 'a' || e.key === 'A') && !e.metaKey && !e.ctrlKey) {
-        if (e.key === 'a' || e.key === 'A' || (e.key === 'Enter' && !e.shiftKey)) {
-          e.preventDefault();
-          void submit('approve');
-        }
-      }
-      if (e.key === 'r' || e.key === 'R') {
+      if (e.key === 'Enter' && !e.shiftKey && !typing) {
         e.preventDefault();
-        void submit('revise');
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setConfirmAbort(true);
+        void submit('approve');
       }
     };
 
@@ -197,47 +194,46 @@ export function EscalationDecision({
       locale === 'ja' &&
       !escalateMatchesLocale(escalation.summary, escalation.options, locale));
 
-  function dismissHint() {
-    setHintVisible(false);
-    try {
-      localStorage.setItem('conductor-esc-hint-seen', '1');
-    } catch {
-      // ignore
-    }
-  }
-
   return (
-    <div className="mx-auto max-w-3xl space-y-6 md:space-y-8 pb-28 md:pb-10">
-      <Suspense fallback={null}>
-        <DecisionCoach />
-      </Suspense>
-      <div className="rounded-xl bg-urgent text-white px-4 py-3 flex items-center gap-3 shadow-sm">
+    <div className="mx-auto max-w-3xl space-y-4 md:space-y-6 pb-28 md:pb-10">
+      <header className="sticky top-0 z-20 -mx-4 md:-mx-0 px-4 md:px-0 py-3 bg-background/90 backdrop-blur border-b border-border/60 flex items-center justify-between gap-3">
+        <Link
+          href="/escalations"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 min-h-11"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t('needsYou.all')}
+        </Link>
+        <p className="text-sm font-medium truncate">{t('needsYou.title')}</p>
+        {!isResolved ? (
+          <span className="shrink-0 text-xs font-semibold text-white bg-urgent rounded-full px-2.5 py-1">
+            {t('app.needsPending', { n: 1 })}
+          </span>
+        ) : (
+          <span className="w-16" />
+        )}
+      </header>
+
+      {!isResolved && (
+        <Suspense fallback={null}>
+          <DecisionCoach tipKey={TIP_KEY} />
+        </Suspense>
+      )}
+
+      <div
+        className="rounded-xl bg-urgent text-white px-4 md:px-5 py-4 flex items-center gap-3"
+        style={{ boxShadow: '0 0 24px var(--urgent-soft)' }}
+      >
         <AlertTriangle className="h-5 w-5 shrink-0 animate-pulse" />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em]">
             {t('needsYou.title')}
           </p>
-          <p className="text-sm text-white/85 truncate">
+          <p className="text-sm text-white/90 truncate">
             {displayName} · {roleLabel(agent.role, locale)}
           </p>
         </div>
         <AgentStatusBadge status={agent.status} />
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          href="/escalations"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {t('needsYou.all')}
-        </Link>
-        <Link
-          href={`/agents/${agent.id}`}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
-        >
-          {t('needsYou.openAgent', { name: displayName })}
-        </Link>
       </div>
 
       <div className="space-y-3">
@@ -246,12 +242,12 @@ export function EscalationDecision({
             {t('needsYou.themeLabel', { theme })}
           </p>
         )}
-        <h1 className="font-display text-3xl md:text-[2.6rem] leading-[1.12] tracking-tight text-balance">
+        <h1 className="font-display text-[1.5rem] md:text-[1.75rem] leading-[1.4] tracking-tight text-balance line-clamp-4">
           {displaySummary}
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl">{t('needsYou.pickDirection')}</p>
         {languageMismatch && !isResolved && (
-          <p className="text-xs rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-950 dark:text-amber-100">
+          <p className="text-xs rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-950 dark:text-amber-100">
             {t('needsYou.languageMismatch')}
           </p>
         )}
@@ -260,18 +256,9 @@ export function EscalationDecision({
         )}
       </div>
 
-      {hintVisible && !isResolved && (
-        <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 flex items-start justify-between gap-3 text-xs text-muted-foreground">
-          <p>{t('needsYou.hintShortcuts')}</p>
-          <button type="button" onClick={dismissHint} className="underline shrink-0">
-            {t('needsYou.gotIt')}
-          </button>
-        </div>
-      )}
-
       <Accordion type="single" collapsible className="rounded-xl border border-border px-4">
         <AccordionItem value="sources" className="border-b border-border">
-          <AccordionTrigger className="hover:no-underline text-sm">
+          <AccordionTrigger className="hover:no-underline text-sm min-h-12">
             {t('needsYou.sourceFindings')}
             <span className="ml-2 text-xs font-normal text-muted-foreground">
               {contextFindings.length}
@@ -287,7 +274,7 @@ export function EscalationDecision({
               {contextFindings.map((finding, i) => (
                 <div
                   key={i}
-                  className="rounded-lg border border-border bg-background/60 p-3 text-sm leading-relaxed whitespace-pre-wrap"
+                  className="rounded-xl border border-border bg-background/60 p-3 text-sm leading-relaxed whitespace-pre-wrap"
                 >
                   {finding}
                 </div>
@@ -299,7 +286,7 @@ export function EscalationDecision({
           </AccordionContent>
         </AccordionItem>
         <AccordionItem value="context" className="border-none">
-          <AccordionTrigger className="hover:no-underline text-sm">
+          <AccordionTrigger className="hover:no-underline text-sm min-h-12">
             {t('needsYou.contextTimeline')}
             <span className="ml-2 text-xs font-normal text-muted-foreground">
               {t('needsYou.events', { n: logs.length })}
@@ -313,7 +300,7 @@ export function EscalationDecision({
               {logs.map((log) => (
                 <div
                   key={log.id}
-                  className="rounded-lg border border-border bg-background/60 p-3"
+                  className="rounded-xl border border-border bg-background/60 p-3"
                 >
                   <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                     <span className="uppercase tracking-wide">
@@ -357,10 +344,10 @@ export function EscalationDecision({
                     type="button"
                     onClick={() => setSelectedOption(option)}
                     className={cn(
-                      'text-left rounded-xl border px-4 py-4 text-sm transition-all duration-150 flex gap-3 w-full',
+                      'text-left rounded-xl px-4 min-h-12 py-3 text-sm transition-all duration-150 flex gap-3 w-full items-center',
                       active
-                        ? 'border-foreground bg-foreground text-background shadow-md scale-[1.01]'
-                        : 'border-border bg-card hover:border-foreground/30'
+                        ? 'border-0 bg-foreground text-background scale-[1.01]'
+                        : 'border border-border bg-card hover:border-foreground/30'
                     )}
                   >
                     <span
@@ -371,7 +358,7 @@ export function EscalationDecision({
                     >
                       {index + 1}
                     </span>
-                    <span className="pt-1.5 leading-relaxed">{label}</span>
+                    <span className="leading-relaxed">{label}</span>
                   </button>
                 );
               })}
@@ -384,7 +371,7 @@ export function EscalationDecision({
               placeholder={t('needsYou.notesPlaceholder')}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[110px]"
+              className="min-h-[88px]"
             />
           </div>
 
@@ -437,7 +424,7 @@ export function EscalationDecision({
             </div>
             {confirmAbort && (
               <div
-                className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 space-y-3"
+                className="mx-auto max-w-3xl rounded-xl border border-destructive/40 bg-destructive/5 p-4 space-y-3 m-3 md:m-0 md:mt-3"
                 role="alertdialog"
                 aria-labelledby="abort-title"
               >
@@ -448,6 +435,7 @@ export function EscalationDecision({
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="destructive"
+                    className="min-h-11"
                     disabled={!!submitting}
                     onClick={() => {
                       setConfirmAbort(false);
@@ -460,7 +448,11 @@ export function EscalationDecision({
                       t('needsYou.yesStop')
                     )}
                   </Button>
-                  <Button variant="outline" onClick={() => setConfirmAbort(false)}>
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={() => setConfirmAbort(false)}
+                  >
                     {t('needsYou.keep')}
                   </Button>
                 </div>
@@ -476,7 +468,7 @@ export function EscalationDecision({
           <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">
             {escalation.human_response}
           </p>
-          <Button asChild className="mt-4" variant="outline">
+          <Button asChild className="mt-4 min-h-11" variant="outline">
             <Link href="/dashboard">{t('needsYou.backDash')}</Link>
           </Button>
         </div>

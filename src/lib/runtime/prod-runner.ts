@@ -88,6 +88,12 @@ export async function startProdAgent(
             code: 'cancelled',
             type: 'handoff',
           });
+          slog('pipeline.halted', {
+            agentId,
+            detail: gate.detail,
+            pipelineId: agent.config.pipeline_id,
+            index,
+          });
           return await loadAgent(agentId);
         }
         throw new RuntimeError('conflict', gate.detail);

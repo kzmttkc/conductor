@@ -1,20 +1,31 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { AlertTriangle, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useEscalations } from '@/hooks/useEscalations';
 import { useT } from '@/i18n/locale-context';
 
+/**
+ * App-wide urgent strip — hidden on Dashboard (has NeedsYouBar)
+ * and escalation detail (decision UI is the primary surface).
+ */
 export function CommandBanner({ userId }: { userId: string }) {
+  const pathname = usePathname();
   const { escalations } = useEscalations(userId);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const playedFor = useRef<Set<string>>(new Set());
   const top = escalations[0];
   const t = useT();
 
+  const hide =
+    pathname === '/dashboard' ||
+    pathname.startsWith('/dashboard/') ||
+    pathname.startsWith('/escalations/');
+
   useEffect(() => {
-    if (!top || playedFor.current.has(top.id)) return;
+    if (!top || hide || playedFor.current.has(top.id)) return;
     playedFor.current.add(top.id);
     try {
       const Ctx =
@@ -34,9 +45,9 @@ export function CommandBanner({ userId }: { userId: string }) {
     } catch {
       // audio optional
     }
-  }, [top]);
+  }, [top, hide]);
 
-  if (!top || dismissed === top.id) return null;
+  if (hide || !top || dismissed === top.id) return null;
 
   return (
     <div
@@ -54,14 +65,14 @@ export function CommandBanner({ userId }: { userId: string }) {
         </div>
         <Link
           href={`/escalations/${top.id}`}
-          className="shrink-0 rounded-md bg-white text-urgent text-xs font-semibold px-3 py-1.5 hover:bg-white/90"
+          className="shrink-0 min-h-11 inline-flex items-center rounded-full bg-white text-urgent text-xs font-semibold px-4 hover:bg-white/90"
         >
           {t('app.decide')}
         </Link>
         <button
           type="button"
           aria-label={t('a11y.dismissBanner')}
-          className="opacity-80 hover:opacity-100"
+          className="opacity-80 hover:opacity-100 min-h-11 min-w-11 inline-flex items-center justify-center"
           onClick={() => setDismissed(top.id)}
         >
           <X className="h-4 w-4" />

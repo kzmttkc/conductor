@@ -68,21 +68,9 @@ export function DashboardView({ userId }: { userId: string }) {
             {t('app.dashboardBlurb')}
           </p>
         </div>
-        {primaryCtaIsResolve ? (
-          <Button asChild size="lg" className="bg-urgent hover:bg-urgent/90 text-white">
-            <Link
-              href={
-                escalations[0]
-                  ? `/escalations/${escalations[0].id}`
-                  : '/escalations'
-              }
-            >
-              <AlertTriangle className="h-4 w-4" />
-              {t('app.resolveNeeds')}
-            </Link>
-          </Button>
-        ) : (
-          <Button asChild size="lg">
+        {/* When Needs You exists, the urgent bar is the sole primary CTA */}
+        {!primaryCtaIsResolve && (
+          <Button asChild size="lg" className="min-h-12">
             <Link href="/templates">
               <Play className="h-4 w-4" />
               {t('app.launchTemplate')}
@@ -91,7 +79,7 @@ export function DashboardView({ userId }: { userId: string }) {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-4">
         <Stat label={t('status.running')} value={running} />
         <Stat
           label={t('needsYou.title')}
@@ -119,65 +107,71 @@ export function DashboardView({ userId }: { userId: string }) {
         </section>
       )}
 
-      {(escalations.length > 0 || recentArtifacts.length > 0) && (
-        <section className="grid gap-4 md:grid-cols-2 pt-2">
-          <div className="rounded-xl border border-border bg-card/80 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">{t('needsYou.needsNow')}</h2>
-              <Link href="/escalations" className="text-xs text-muted-foreground hover:text-foreground">
-                {t('needsYou.all')} →
-              </Link>
-            </div>
-            {escalations.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('needsYou.emptyTitle')}</p>
-            ) : (
-              <ul className="space-y-2">
-                {escalations.slice(0, 3).map((e) => (
-                  <li key={e.id}>
-                    <Link
-                      href={`/escalations/${e.id}`}
-                      className="block rounded-lg border border-urgent/25 bg-urgent/5 px-3 py-2.5 text-sm hover:bg-urgent/10 transition-colors"
-                    >
-                      <span className="line-clamp-2">
-                        {formatEscalationSummary(e.summary, e.context, t)}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <section className="grid gap-4 md:grid-cols-2 pt-2">
+        <div className="rounded-xl border border-subtle bg-card/80 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium">{t('needsYou.needsNow')}</h2>
+            <Link href="/escalations" className="text-xs text-muted-foreground hover:text-foreground">
+              {t('needsYou.all')} →
+            </Link>
           </div>
-          <div className="rounded-xl border border-border bg-card/80 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">{t('results.title')}</h2>
-              <Link href="/results" className="text-xs text-muted-foreground hover:text-foreground">
-                {t('results.all')} →
-              </Link>
-            </div>
-            {recentArtifacts.length === 0 ? (
+          {escalations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('needsYou.emptyTitle')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {escalations.slice(0, 3).map((e) => (
+                <li key={e.id}>
+                  <Link
+                    href={`/escalations/${e.id}`}
+                    className="block rounded-xl border border-subtle px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="line-clamp-2">
+                      {formatEscalationSummary(e.summary, e.context, t)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-xl border border-subtle bg-card/80 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium">{t('results.title')}</h2>
+            <Link href="/results" className="text-xs text-muted-foreground hover:text-foreground">
+              {t('results.all')} →
+            </Link>
+          </div>
+          {recentArtifacts.length === 0 ? (
+            <div className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('results.emptyTitle')}</p>
-            ) : (
-              <ul className="space-y-2">
-                {recentArtifacts.map((a) => (
-                  <li key={a.id}>
-                    <Link
-                      href={`/results/${a.id}`}
-                      className="block rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
-                    >
-                      <span className="font-medium line-clamp-1">
-                        {formatArtifactTitle(a.title, t, { customMap })}
-                      </span>
-                      <span className="block text-xs text-muted-foreground mt-0.5">
-                        {formatRelativeTime(a.created_at, locale)}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
-      )}
+              <Link
+                href="/templates"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                {t('app.launchTemplate')}
+              </Link>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {recentArtifacts.map((a) => (
+                <li key={a.id}>
+                  <Link
+                    href={`/results/${a.id}`}
+                    className="block rounded-xl border border-subtle px-3 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="font-medium line-clamp-1">
+                      {formatArtifactTitle(a.title, t, { customMap })}
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      {formatRelativeTime(a.created_at, locale)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
@@ -194,23 +188,23 @@ function NeedsYouBar({
   return (
     <Link
       href={escalation ? `/escalations/${escalation.id}` : '/escalations'}
-      className="block rounded-xl bg-urgent text-white shadow-sm urgent-ring transition-transform duration-150 hover:scale-[1.01]"
+      className="block rounded-xl bg-urgent text-white transition-transform duration-150 hover:scale-[1.01] urgent-ring"
     >
-      <div className="min-h-14 px-4 py-3.5 md:px-5 md:py-4 flex items-center gap-3 md:gap-4">
-        <div className="h-10 w-10 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-          <AlertTriangle className="h-5 w-5 animate-pulse" />
-        </div>
+      <div className="min-h-14 p-4 flex items-center gap-4">
+        <AlertTriangle className="h-5 w-5 shrink-0 animate-pulse" />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/95">
-            {t('app.needsPending', { n: count })}
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/95">
+            {count > 1
+              ? t('app.needsPending', { n: count })
+              : t('needsYou.title')}
           </p>
-          <p className="text-sm md:text-base font-medium line-clamp-2 mt-0.5">
+          <p className="text-sm font-medium line-clamp-2 mt-1 leading-snug">
             {escalation
               ? formatEscalationSummary(escalation.summary, escalation.context, t)
               : t('dashboard.waitingDecision')}
           </p>
         </div>
-        <span className="shrink-0 min-h-11 inline-flex items-center text-sm font-bold bg-white text-urgent rounded-md px-4">
+        <span className="shrink-0 min-h-12 inline-flex items-center text-sm font-bold bg-white text-urgent rounded-full px-4">
           {t('app.decide')}
         </span>
       </div>
@@ -232,14 +226,14 @@ function Stat({
   const inner = (
     <div
       className={cn(
-        'rounded-xl border border-border bg-card/80 px-3 py-3 md:px-4 md:py-4',
+        'rounded-xl border border-subtle bg-card/80 px-4 py-4',
         tone === 'urgent' && value > 0 && 'border-urgent/40 bg-urgent/5'
       )}
     >
-      <p className="text-[11px] md:text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={cn(
-          'mt-1 text-2xl md:text-3xl font-semibold tracking-tight',
+          'mt-1 text-[28px] md:text-[32px] font-semibold tracking-tight leading-none',
           tone === 'urgent' && value > 0 && 'text-urgent'
         )}
       >
@@ -254,10 +248,10 @@ function EmptyState() {
   const t = useT();
 
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
+    <div className="rounded-xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
       <h2 className="font-display text-2xl">{t('app.launchTemplate')}</h2>
       <p className="text-muted-foreground mt-2 max-w-md mx-auto">{t('templates.blurb')}</p>
-      <Button asChild size="lg" className="mt-6">
+      <Button asChild size="lg" className="mt-6 min-h-12">
         <Link href="/templates">
           <Play className="h-4 w-4" />
           {t('app.launchTemplate')}

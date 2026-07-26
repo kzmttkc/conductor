@@ -67,12 +67,12 @@ export function AppShell({
         aria-label={t('nav.more')}
         aria-expanded={moreOpen}
         className={cn(
-          'group relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-150',
+          'group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors duration-150',
           moreOpen ||
             pathname.startsWith('/templates') ||
             pathname.startsWith('/settings') ||
             pathname.startsWith('/help')
-            ? 'bg-foreground/10 text-foreground'
+            ? 'bg-foreground/10 dark:bg-white/10 text-foreground'
             : 'text-muted-foreground hover:bg-muted hover:text-foreground'
         )}
       >
@@ -107,7 +107,7 @@ export function AppShell({
       >
         <CommandBanner userId={userId} />
 
-        <header className="sticky top-0 z-20 h-12 border-b border-border bg-background/85 backdrop-blur px-4 flex items-center justify-between gap-3 md:px-6">
+        <header className="sticky top-0 z-20 h-14 border-b border-border bg-background/85 backdrop-blur px-4 flex items-center justify-between gap-3 md:px-6">
           <div className="min-w-0">
             <div className="md:hidden">
               <BrandInline
@@ -122,7 +122,7 @@ export function AppShell({
               href={
                 escalations[0] ? `/escalations/${escalations[0].id}` : '/escalations'
               }
-              className="shrink-0 min-h-9 inline-flex items-center text-xs font-semibold text-white bg-urgent px-3 rounded-md animate-pulse transition-opacity duration-150 hover:opacity-90"
+              className="shrink-0 min-h-11 inline-flex items-center text-xs font-semibold text-white bg-urgent px-4 rounded-full animate-pulse transition-opacity duration-150 hover:opacity-90"
             >
               {t('app.needsPending', { n: pendingCount })}
             </Link>

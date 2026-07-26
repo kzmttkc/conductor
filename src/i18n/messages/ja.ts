@@ -270,7 +270,7 @@ export const ja: Messages = {
       '実績あるチームから開始。Free: ソロ・スカウトまたはコンテンツ・パイプライン（最大2体）。市場調査クルーはアップグレード。',
     themeLabel: '何を調べさせますか？',
     launch: 'チームを起動',
-    needsUpgrade: 'アップグレードが必要',
+    needsUpgrade: 'Starter でこのクルーが使えます（5体）',
     launched: 'チームを起動しました — Needs You を注視してください',
     planLimit: 'プラン上限',
     viewPlans: 'プランを見る',
@@ -565,6 +565,8 @@ export const ja: Messages = {
       '「{theme}」のソースが矛盾または不足しています。市場規模が大きい見方と保守的な見方があります。どちらを主としますか？',
     summaryTimeout:
       '「{theme}」の実行が {seconds} 秒でタイムアウトしました。範囲を狭めて再開するか、停止しますか？',
+    summarySearchFailed:
+      '「{theme}」の Web 検索に失敗しました。どう進めますか？',
     optionApproveContinue: '現状の方針で承認して続行',
     optionNarrowCompetitors: '主要競合のみに範囲を絞る',
     optionPauseDeeper: '一時停止してより深い一次ソースを求める',
@@ -573,6 +575,9 @@ export const ja: Messages = {
     optionAbort: 'エージェントを停止',
     optionAllowTool: 'この実行で {tool} を許可',
     optionDenyTool: '{tool} を拒否してなしで続行',
+    optionRetrySearch: 'Web 検索を再試行',
+    optionSkipSearch: '権限を確認し、検索なしで続行',
+    optionChangeTheme: '調査テーマを変更する',
   },
   artifact: {
     pipelineSummary: 'パイプライン要約: {theme}',

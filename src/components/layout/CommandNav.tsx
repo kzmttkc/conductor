@@ -107,9 +107,9 @@ export function CommandNav({
                 }
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'group relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-150',
+                  'group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors duration-150',
                   active
-                    ? 'bg-foreground/10 text-foreground'
+                    ? 'bg-foreground/10 dark:bg-white/10 text-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >

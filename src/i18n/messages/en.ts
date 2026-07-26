@@ -268,7 +268,7 @@ export const en = {
       'Start from a proven team. Free: Solo Scout or Content Pipeline (2 agents max). Upgrade for Research Crew.',
     themeLabel: 'What should they research?',
     launch: 'Launch crew',
-    needsUpgrade: 'Needs upgrade',
+    needsUpgrade: 'Starter unlocks this crew (5 agents)',
     launched: 'Crew launched — watch for Needs You',
     planLimit: 'Plan limit',
     viewPlans: 'View plans',
@@ -564,6 +564,8 @@ export const en = {
       'Sources conflict or are incomplete for “{theme}”. One cluster implies a larger market; another is more conservative. Which framing should I treat as primary?',
     summaryTimeout:
       'Pass timed out after {seconds}s on “{theme}”. Resume with narrower scope, or abort?',
+    summarySearchFailed:
+      'Web search failed for “{theme}”. How should we proceed?',
     optionApproveContinue: 'Approve and continue with current direction',
     optionNarrowCompetitors: 'Narrow scope to primary competitors only',
     optionPauseDeeper: 'Pause and request deeper primary sources',
@@ -572,6 +574,9 @@ export const en = {
     optionAbort: 'Stop the agent',
     optionAllowTool: 'Allow {tool} for this run',
     optionDenyTool: 'Deny {tool} and continue without it',
+    optionRetrySearch: 'Retry web search',
+    optionSkipSearch: 'Check tool permissions and continue without search',
+    optionChangeTheme: 'Change the research theme',
   },
   artifact: {
     pipelineSummary: 'Pipeline summary: {theme}',

@@ -16,6 +16,7 @@ import type {
 } from '@/lib/supabase/types';
 import { PLAN_LIMITS, normalizePermission, TOOL_NAMES } from '@/lib/supabase/types';
 import { getBundledTemplate, listBundledTemplates } from '@/lib/templates/catalog';
+import { clipSummary, clipText } from '@/lib/security/validate';
 
 async function db() {
   const supabase = await createClient();
@@ -282,13 +283,15 @@ export async function insertEscalation(input: {
   options?: string[];
   context?: Record<string, unknown>;
 }) {
+  const summary = clipSummary(input.summary);
+  const options = (input.options ?? []).map((o) => clipText(o, 500)).slice(0, 6);
   const supabase = await db();
   const { data, error } = await supabase
     .from('escalations')
     .insert({
       agent_id: input.agent_id,
-      summary: input.summary,
-      options: input.options ?? [],
+      summary,
+      options,
       context: input.context ?? {},
       status: 'pending',
     })
@@ -297,7 +300,7 @@ export async function insertEscalation(input: {
   if (error) throw error;
   await updateAgent(input.agent_id, {
     status: 'waiting_human',
-    current_task: `Awaiting decision: ${input.summary}`,
+    current_task: `Awaiting decision: ${summary}`,
   });
   return data as Escalation;
 }

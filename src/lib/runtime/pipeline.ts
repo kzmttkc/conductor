@@ -52,7 +52,16 @@ export function collectUpstreamMarkdown(
 function isStoppedByCommander(agent: Agent) {
   return (
     agent.status === 'idle' &&
-    /stopped|cancel/i.test(agent.current_task || '')
+    /stopped|cancel|halted/i.test(agent.current_task || '')
+  );
+}
+
+/** Prior stage failed or was cancelled — followers must not start. */
+function isPriorHalted(agent: Agent) {
+  return (
+    agent.status === 'error' ||
+    isStoppedByCommander(agent) ||
+    (agent.status === 'idle' && /Pipeline halted/i.test(agent.current_task || ''))
   );
 }
 
@@ -72,7 +81,7 @@ export function canStartPipelineStage(opts: {
     if (!prior) {
       return { ok: false, reason: 'blocked', detail: `Missing prior agent ${id}` };
     }
-    if (prior.status === 'error' || isStoppedByCommander(prior)) {
+    if (isPriorHalted(prior)) {
       return {
         ok: false,
         reason: 'blocked',

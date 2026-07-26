@@ -36,21 +36,20 @@ export function AgentCard({
     displayNameJa: displayNameJaFromConfig(agent.config),
     customMap,
   });
-  const isUrgent = agent.status === 'waiting_human' || agent.status === 'error';
   const needsYou = agent.status === 'waiting_human';
   const taskLabel = agent.current_task
     ? formatCurrentTask(agent.current_task, t)
     : t('agent.standingBy');
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full group/card">
       {dragHandleProps && (
         <button
           type="button"
           aria-label={t('agent.reorderAria', {
             name: displayName,
           })}
-          className="absolute left-2 top-3 z-10 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-grab active:cursor-grabbing"
+          className="absolute left-2 top-3 z-10 rounded-md p-1 text-muted-foreground/40 opacity-60 hover:opacity-100 hover:bg-muted hover:text-foreground cursor-grab active:cursor-grabbing transition-opacity duration-150 group-hover/card:opacity-100 group-hover/card:text-muted-foreground"
           {...dragHandleProps}
         >
           <GripVertical className="h-4 w-4" />
@@ -59,10 +58,9 @@ export function AgentCard({
       <Link href={`/agents/${agent.id}`} className="block group h-full">
         <Card
           className={cn(
-            'h-full rounded-xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+            'h-full rounded-xl border border-subtle bg-card transition-all duration-200 hover:-translate-y-0.5',
             dragHandleProps && 'pl-5',
-            isUrgent && 'urgent-ring border-urgent/40',
-            needsYou && 'bg-urgent/[0.08] ring-2 ring-urgent/45 shadow-[0_0_0_1px_rgba(214,69,69,0.25)]'
+            needsYou && 'urgent-ring border-urgent/40 bg-urgent/[0.08]'
           )}
         >
           <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0 gap-3">

@@ -6,6 +6,7 @@ type LogEvent =
   | 'agent.complete'
   | 'agent.error'
   | 'pipeline.handoff'
+  | 'pipeline.halted'
   | 'plan.limit_hit'
   | 'plan.limit_soft'
   | 'stripe.webhook'

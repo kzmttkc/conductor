@@ -11,6 +11,7 @@ import {
 } from '@/lib/runtime/prod-runner';
 import { RuntimeError } from '@/lib/runtime/errors';
 import { getServerLocale } from '@/i18n/locale-server';
+import { clientKey, rateLimit } from '@/lib/security/rate-limit';
 
 function recentErrors<T extends { type: string }>(logs: T[]) {
   return logs.filter((l) => l.type === 'error').slice(-10).reverse();
@@ -72,6 +73,16 @@ export async function PATCH(
       try {
         const locale = await getServerLocale();
         if (body.action === 'start') {
+          const rl = rateLimit(`start:${clientKey(request, user.id)}`, {
+            limit: 20,
+            windowMs: 60_000,
+          });
+          if (!rl.ok) {
+            return NextResponse.json(
+              { error: 'Too many starts. Try again shortly.', code: 'RATE_LIMIT' },
+              { status: 429 }
+            );
+          }
           await store.startRuntime(id, null, locale);
           return NextResponse.json(store.getAgent(id));
         }
@@ -137,6 +148,16 @@ export async function PATCH(
   try {
     const locale = await getServerLocale();
     if (body.action === 'start') {
+      const rl = rateLimit(`start:${clientKey(request, user.id)}`, {
+        limit: 20,
+        windowMs: 60_000,
+      });
+      if (!rl.ok) {
+        return NextResponse.json(
+          { error: 'Too many starts. Try again shortly.', code: 'RATE_LIMIT' },
+          { status: 429 }
+        );
+      }
       await startProdAgent(id, null, locale);
       return NextResponse.json(await data.getAgentForUser(user.id, id));
     }

@@ -13,6 +13,16 @@ export interface SearchResult {
   snippet: string;
 }
 
+export class WebSearchFailedError extends Error {
+  constructor(
+    message: string,
+    public readonly reason: string
+  ) {
+    super(message);
+    this.name = 'WebSearchFailedError';
+  }
+}
+
 export async function webSearch(
   query: string,
   limit = 5,
@@ -28,6 +38,8 @@ export async function webSearch(
       ? `${query} 日本語 日本 市場 競合`
       : `${query} 日本 OR 市場`;
   }
+
+  const errors: string[] = [];
   const tavily = process.env.TAVILY_API_KEY;
   if (tavily) {
     try {
@@ -51,8 +63,11 @@ export async function webSearch(
           snippet: r.content || '',
         }));
       }
-    } catch {
-      // fall through
+      errors.push(`tavily_http_${res.status}`);
+    } catch (err) {
+      errors.push(
+        `tavily_error:${err instanceof Error ? err.message : 'unknown'}`
+      );
     }
   }
 
@@ -61,7 +76,7 @@ export async function webSearch(
     const res = await fetch(url, {
       headers: { 'User-Agent': 'ConductorAgent/1.0' },
     });
-    if (!res.ok) throw new Error('search failed');
+    if (!res.ok) throw new Error(`ddg_http_${res.status}`);
     const data = (await res.json()) as {
       AbstractText?: string;
       AbstractURL?: string;
@@ -97,13 +112,12 @@ export async function webSearch(
       ];
     }
     return results.slice(0, limit);
-  } catch {
-    return [
-      {
-        title: rt(locale, 'search.offlineTitle', { query }),
-        url: '',
-        snippet: rt(locale, 'search.offlineSnippet'),
-      },
-    ];
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : 'ddg_failed');
+    const reason = errors.join('; ') || 'search_unavailable';
+    throw new WebSearchFailedError(
+      `Web search failed (${reason}). Choose how to proceed.`,
+      reason
+    );
   }
 }

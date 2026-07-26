@@ -25,7 +25,7 @@ import {
   canStartPipelineStage,
   collectUpstreamMarkdown,
 } from '@/lib/runtime/pipeline';
-import { sanitizeMarkdown, clipText } from '@/lib/security/validate';
+import { sanitizeMarkdown, clipText, clipSummary } from '@/lib/security/validate';
 import { getBundledTemplate, listBundledTemplates } from '@/lib/templates/catalog';
 import { agentLabel, localizeAgentDefinition } from '@/lib/templates/ja-overlays';
 import { rt } from '@/lib/runtime/locale';
@@ -221,13 +221,15 @@ export class DemoStore extends EventEmitter {
     context?: Record<string, unknown>;
     options?: string[];
   }) {
+    const summary = clipSummary(input.summary);
+    const options = (input.options ?? []).map((o) => clipText(o, 500)).slice(0, 6);
     const escalation: Escalation = {
       id: randomUUID(),
       agent_id: input.agent_id,
       status: 'pending',
-      summary: input.summary,
+      summary,
       context: input.context ?? {},
-      options: input.options ?? [],
+      options,
       human_response: null,
       resolved_at: null,
       created_at: this.now(),
@@ -236,9 +238,9 @@ export class DemoStore extends EventEmitter {
     this.usage.escalations += 1;
     this.updateAgent(input.agent_id, {
       status: 'waiting_human',
-      current_task: `Awaiting decision: ${input.summary}`,
+      current_task: `Awaiting decision: ${summary}`,
     });
-    this.addLog(input.agent_id, 'escalation', input.summary, {
+    this.addLog(input.agent_id, 'escalation', summary, {
       escalation_id: escalation.id,
     });
     this.emitChange({ type: 'escalations', payload: escalation, event: 'INSERT' });
@@ -740,6 +742,12 @@ export class DemoStore extends EventEmitter {
             current_task: `Pipeline halted: ${gate.detail}`,
           });
           this.addLog(agentId, 'error', gate.detail, { code: 'cancelled', type: 'handoff' });
+          slog('pipeline.halted', {
+            agentId,
+            detail: gate.detail,
+            pipelineId: agent.config.pipeline_id,
+            index,
+          });
           return;
         }
         throw new RuntimeError('conflict', gate.detail);

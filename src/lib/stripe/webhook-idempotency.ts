@@ -2,6 +2,10 @@
  * Process-local Stripe event idempotency.
  * Prevents double-applying the same event in one instance.
  * Call releaseStripeEvent on handler failure so Stripe retries can re-apply.
+ *
+ * Note: This is in-memory only. Multi-instance / cold starts can still
+ * double-apply; durable idempotency should use a DB unique constraint on
+ * stripe_event_id when scaling beyond a single process.
  */
 
 const seen = new Map<string, number>();
