@@ -49,11 +49,14 @@ export function DashboardView({ userId }: { userId: string }) {
         <div>
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             <Radio className="h-3.5 w-3.5 text-success" />
-            Command tower
+            Live overview
           </p>
           <h1 className="font-display text-3xl md:text-4xl tracking-tight mt-1">
             Dashboard
           </h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-lg">
+            See who is working, who needs you, and what is ready to read.
+          </p>
         </div>
         {primaryCtaIsResolve ? (
           <Button asChild size="lg" className="bg-urgent hover:bg-urgent/90 text-white">
@@ -234,7 +237,7 @@ function EmptyState() {
     <div className="rounded-2xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
       <h2 className="font-display text-2xl">Launch a template</h2>
       <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-        Put a crew on the floor. Free: Solo Scout or Content Pipeline.
+        Start with Solo Scout or Content Pipeline on Free — then decide when they ask.
       </p>
       <Button asChild size="lg" className="mt-6">
         <Link href="/templates">

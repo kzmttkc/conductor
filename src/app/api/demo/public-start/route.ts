@@ -24,7 +24,10 @@ const SOLO_SCOUT_ID = '33333333-3333-4333-8333-333333333333';
 export async function POST(request: Request) {
   if (!isDemoMode()) {
     return NextResponse.json(
-      { error: 'Public demo requires Demo Mode (NEXT_PUBLIC_DEMO_MODE=true)' },
+      {
+        error:
+          'The live demo is not available on this deployment. Sign in to use Conductor.',
+      },
       { status: 400 }
     );
   }
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const theme = clipTheme(body.theme || 'AI agent orchestration market 2026');
+  const theme = clipTheme(body.theme || 'Electric vehicle market trends 2026');
   const visitorId = createVisitorId();
   const user = visitorFromSession(visitorId)!;
 

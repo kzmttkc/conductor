@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { Agent, AgentLog, Escalation } from '@/lib/supabase/types';
 import { EscalationDecision } from '@/components/escalation/EscalationDecision';
+import { Button } from '@/components/ui/button';
 
 export default function EscalationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -20,7 +22,7 @@ export default function EscalationDetailPage() {
     const load = async () => {
       const res = await fetch(`/api/escalations/${params.id}`);
       if (!res.ok) {
-        if (!cancelled) setError('Escalation not found');
+        if (!cancelled) setError('Decision not found');
         return;
       }
       const json = await res.json();
@@ -33,7 +35,21 @@ export default function EscalationDetailPage() {
   }, [params.id]);
 
   if (error) {
-    return <p className="text-muted-foreground">{error}</p>;
+    return (
+      <div className="max-w-md space-y-4 py-12">
+        <p className="text-muted-foreground">
+          This decision may have been resolved or no longer exists.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/escalations">View all Needs You</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/dashboard">Back to dashboard</Link>
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (!data) {

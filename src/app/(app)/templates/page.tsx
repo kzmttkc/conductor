@@ -17,7 +17,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [plan, setPlan] = useState<PlanTier>('free');
   const [agentCount, setAgentCount] = useState(0);
-  const [theme, setTheme] = useState('AI agent orchestration market 2026');
+  const [theme, setTheme] = useState('Electric vehicle market trends 2026');
   const [loading, setLoading] = useState(true);
   const [launching, setLaunching] = useState<string | null>(null);
   const [limitError, setLimitError] = useState<{
@@ -79,7 +79,7 @@ export default function TemplatesPage() {
         }
         throw new Error(data.error || 'Launch failed');
       }
-      toast.success(`Crew launched (${data.agents.length} agents)`);
+      toast.success('Crew launched — watch for Needs You');
       router.push('/dashboard');
       router.refresh();
     } catch (err) {
@@ -96,8 +96,8 @@ export default function TemplatesPage() {
       <div>
         <h1 className="font-display text-4xl tracking-tight">Templates</h1>
         <p className="text-muted-foreground mt-2 max-w-2xl">
-          Start from a proven crew. Free allows {PLAN_LIMITS.free.maxAgents} agents —
-          use Solo Scout or Competitor Watch, or upgrade for Research Crew.
+          Start from a proven crew. Free: Solo Scout or Content Pipeline (2 agents
+          max). Upgrade for Research Crew.
         </p>
         <p className="text-xs text-muted-foreground mt-2">
           Plan: {PLAN_LIMITS[plan].label} · {agentCount}/{limit} agents used
@@ -127,14 +127,30 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      <div className="surface rounded-xl p-5 max-w-xl space-y-2">
-        <Label htmlFor="theme">Mission theme</Label>
+      <div className="surface rounded-xl p-5 max-w-xl space-y-3">
+        <Label htmlFor="theme">What should they research?</Label>
         <Input
           id="theme"
           value={theme}
           onChange={(e) => setTheme(e.target.value)}
-          placeholder="What should the crew investigate?"
+          placeholder="e.g. Electric vehicle market trends 2026"
         />
+        <div className="flex flex-wrap gap-2">
+          {[
+            'Electric vehicle market trends 2026',
+            'B2B SaaS pricing strategies',
+            'Local coffee shop marketing ideas',
+          ].map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => setTheme(chip)}
+              className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -172,7 +188,9 @@ export default function TemplatesPage() {
                           <p className="text-muted-foreground">{def.role}</p>
                         </div>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {def.escalation_conditions.length} triggers
+                          {def.escalation_conditions.length === 0
+                            ? 'Asks you when needed'
+                            : `${def.escalation_conditions.length} decision point${def.escalation_conditions.length === 1 ? '' : 's'}`}
                         </span>
                       </li>
                     ))}

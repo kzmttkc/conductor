@@ -71,7 +71,7 @@ export function SiteHeader({ signedIn = false }: Props) {
               <Link
                 href="/login"
                 className={cn(
-                  'hidden sm:inline-flex text-sm transition-colors',
+                  'inline-flex text-sm transition-colors',
                   isMoment
                     ? 'text-white/70 hover:text-white'
                     : 'text-[#6b6b66] hover:text-[#141414]'

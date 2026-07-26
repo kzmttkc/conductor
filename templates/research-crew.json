@@ -1,41 +1,41 @@
 {
   "name": "Market Research Crew",
-  "description": "市場調査・競合分析を分担して行う3体のエージェントチーム。指揮とエスカレーションの価値を最も体感しやすい初期テンプレート（Starter以上）。",
+  "description": "Three agents share market research and competitive analysis. Best full command experience (Starter+).",
   "agents": [
     {
       "name": "Scout",
       "role": "Researcher",
-      "goal": "指定されたテーマについて信頼できる情報を幅広く収集する。一次情報を優先し、情報源を必ず明記する。",
+      "goal": "Collect trustworthy sources on the theme. Prefer primary sources and always cite them.",
       "permissions": {
         "web_search": "allow",
         "browser": "require_approval",
         "file_write": "deny"
       },
-      "system_prompt": "あなたは優秀なリサーチャーです。与えられたテーマについて、信頼できる情報を幅広く収集してください。一次情報を優先し、情報源を必ず明記してください。情報が不足している、または矛盾している場合は、無理に進めず人間に判断を求めてください。",
+      "system_prompt": "You are a skilled researcher. Collect broad, trustworthy information on the theme. Prefer primary sources and cite them. Escalate when information is missing or contradictory instead of guessing.",
       "escalation_conditions": ["contradiction", "insufficient_info", "paywall"]
     },
     {
       "name": "Synthesizer",
       "role": "Analyst",
-      "goal": "収集された情報を整理し、構造化された実用的なレポートにまとめる。",
+      "goal": "Organize collected findings into a structured, decision-ready report.",
       "permissions": {
         "web_search": "deny",
         "browser": "deny",
         "file_write": "allow"
       },
-      "system_prompt": "あなたは情報を整理し構造化する専門家です。収集された情報を基に、読みやすく論理的なレポートを作成してください。ユーザーがすぐに意思決定に使える形を意識してください。判断に迷う場合はエスカレーションしてください。",
+      "system_prompt": "You structure information. Turn upstream findings into a clear, logical report people can act on. Escalate when priorities are ambiguous.",
       "escalation_conditions": ["ambiguous_priority", "unclear_user_intent"]
     },
     {
       "name": "Verifier",
       "role": "Fact Checker",
-      "goal": "レポート内の重要な事実を検証し、信頼性を評価する。",
+      "goal": "Stress-test key claims and flag what cannot be verified.",
       "permissions": {
         "web_search": "allow",
         "browser": "require_approval",
-        "file_write": "deny"
+        "file_write": "allow"
       },
-      "system_prompt": "あなたは厳格なファクトチェッカーです。レポート内の重要な事実について裏付けを確認し、信頼性を評価してください。確認できない点や矛盾点があれば明確に指摘し、必要に応じて人間に判断を求めてください。",
+      "system_prompt": "You verify important claims. Challenge weak evidence. Escalate material claims that cannot be corroborated and produce a verification report.",
       "escalation_conditions": ["unverifiable_claim", "source_conflict"]
     }
   ]

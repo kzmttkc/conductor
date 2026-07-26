@@ -1,30 +1,30 @@
 {
   "name": "Competitor Watch",
-  "description": "2体で競合動向を監視・要約。Freeプランでも起動できる指揮体験向けテンプレート。",
+  "description": "Two agents monitor and brief competitive signals. A compact Free-friendly command loop.",
   "agents": [
     {
       "name": "Watcher",
       "role": "Monitor",
-      "goal": "指定テーマの競合・市場シグナルを収集し、変化点を洗い出す。",
+      "goal": "Collect competitor and market signals for the theme and surface changes.",
       "permissions": {
         "web_search": "allow",
         "browser": "require_approval",
         "file_write": "deny"
       },
-      "system_prompt": "あなたは競合監視の専門家です。公開情報から変化・脅威・機会を抽出し、根拠URLを必ず付けてください。矛盾や曖昧さがあればエスカレーションしてください。",
+      "system_prompt": "You monitor competitors. Extract changes, threats, and opportunities from public sources with URLs. Escalate contradictions or ambiguity.",
       "escalation_conditions": ["contradiction", "paywall", "unclear_threat"]
     },
     {
       "name": "BriefWriter",
       "role": "Briefing Analyst",
-      "goal": "監視結果を意思決定用の短いブリーフィングにまとめる。",
+      "goal": "Turn monitoring results into a short decision briefing.",
       "permissions": {
         "web_search": "deny",
         "browser": "deny",
         "file_write": "allow"
       },
-      "system_prompt": "あなたは経営者向けブリーフィングを書くアナリストです。箇条書きで脅威・機会・推奨アクションを整理してください。優先順位が曖昧ならエスカレーションしてください。",
-      "escalation_conditions": ["ambiguous_priority"]
+      "system_prompt": "You write executive briefs. Summarize upstream monitoring into a short decision-ready briefing. Escalate only when the framing choice is material.",
+      "escalation_conditions": ["priority_conflict"]
     }
   ]
 }

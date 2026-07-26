@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { UsageMeters } from '@/components/usage/UsageMeters';
 import { PLAN_LIMITS, type PlanTier, type UsageStats } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
@@ -38,7 +44,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
-      toast.success('Checkout complete — plan updates when the webhook lands.');
+      toast.success('Checkout complete — your plan will update shortly.');
       void refresh();
     }
   }, []);
@@ -85,7 +91,7 @@ export default function SettingsPage() {
   }
 
   async function resetDemo() {
-    if (!confirm('Clear all agents, logs, reports, and escalations?')) return;
+    if (!confirm('Clear all agents, logs, reports, and Needs You items?')) return;
     setResetting(true);
     try {
       const res = await fetch('/api/reset', { method: 'POST' });
@@ -106,13 +112,15 @@ export default function SettingsPage() {
       <div>
         <h1 className="font-display text-4xl tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-2">
-          Plans, usage, and runtime. Stripe Checkout runs when keys are configured.
+          Manage your plan, usage, and billing.
         </p>
-        <div className="mt-4">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/templates">Templates →</Link>
-          </Button>
-        </div>
+        <Link
+          href="/templates"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:border-foreground/30 transition-colors"
+        >
+          Templates →
+          <span className="text-muted-foreground font-normal">Launch another crew</span>
+        </Link>
       </div>
 
       <section className="surface rounded-xl p-5 space-y-3">
@@ -120,7 +128,7 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground">
           {loading
             ? 'Loading…'
-            : `${PLAN_LIMITS[plan].label} · soft caps enforce runs & tokens before upgrade`}
+            : `${PLAN_LIMITS[plan].label} plan · ${agentCount} of ${PLAN_LIMITS[plan].maxAgents} agents in use`}
         </p>
         {usage && <UsageMeters plan={plan} usage={usage} agentCount={agentCount} />}
         {usage && (
@@ -130,10 +138,10 @@ export default function SettingsPage() {
         )}
         {runtime && (
           <p className="text-xs text-muted-foreground pt-1">
-            Runtime:{' '}
+            AI mode:{' '}
             {runtime.llmEnabled
-              ? `LLM (${runtime.provider})`
-              : 'Structured + web search (set OPENAI_API_KEY or ANTHROPIC_API_KEY for real LLM)'}
+              ? `Connected (${runtime.provider})`
+              : 'Structured responses with web search'}
           </p>
         )}
       </section>
@@ -177,16 +185,35 @@ export default function SettingsPage() {
       <section className="surface rounded-xl p-5 space-y-3">
         <h2 className="font-medium">Billing</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          With <code className="text-xs">STRIPE_SECRET_KEY</code> + price IDs, plan
-          clicks open Stripe Checkout. Webhook at{' '}
-          <code className="text-xs">/api/stripe/webhook</code> updates the plan.
+          Paid plans open secure checkout. Your plan updates automatically after
+          payment.
         </p>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="developer" className="border-none">
+            <AccordionTrigger className="py-2 text-sm text-muted-foreground hover:no-underline">
+              Developer details
+            </AccordionTrigger>
+            <AccordionContent className="text-xs text-muted-foreground space-y-2">
+              <p>
+                Stripe Checkout requires <code>STRIPE_SECRET_KEY</code> and price
+                IDs in your environment.
+              </p>
+              <p>
+                Webhook endpoint: <code>/api/stripe/webhook</code>
+              </p>
+              <p>
+                LLM providers: set <code>OPENAI_API_KEY</code> or{' '}
+                <code>ANTHROPIC_API_KEY</code> for live model calls.
+              </p>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </section>
 
       <section className="surface rounded-xl p-5 space-y-3">
-        <h2 className="font-medium">Dogfood reset</h2>
+        <h2 className="font-medium">Reset workspace</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Clear the floor and run a crew again.
+          Clear all agents, logs, reports, and Needs You items to start fresh.
         </p>
         <Button variant="destructive" onClick={resetDemo} disabled={resetting}>
           {resetting ? 'Resetting…' : 'Reset demo floor'}

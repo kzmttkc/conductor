@@ -12,7 +12,7 @@ const statusConfig: Record<AgentStatus, { label: string; className: string }> = 
     className: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-transparent',
   },
   waiting_human: {
-    label: 'Needs You',
+    label: 'Needs you',
     className: 'bg-urgent/15 text-urgent border-transparent animate-pulse',
   },
   error: {

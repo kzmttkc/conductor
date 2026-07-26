@@ -16,6 +16,8 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { DecisionCoach } from '@/components/demo/DecisionCoach';
+import { Suspense } from 'react';
 
 export function EscalationDecision({
   escalation,
@@ -36,6 +38,7 @@ export function EscalationDecision({
   );
   const [resuming, setResuming] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
+  const [confirmAbort, setConfirmAbort] = useState(false);
 
   useEffect(() => {
     try {
@@ -129,7 +132,8 @@ export function EscalationDecision({
       }
       if (e.key === 'Escape') {
         e.preventDefault();
-        void submit('cancel');
+        // Esc asks for confirm — do not instantly abort the agent
+        setConfirmAbort(true);
       }
     };
 
@@ -152,6 +156,9 @@ export function EscalationDecision({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 md:space-y-8 pb-28 md:pb-10">
+      <Suspense fallback={null}>
+        <DecisionCoach />
+      </Suspense>
       <div className="rounded-xl bg-urgent text-white px-4 py-3 flex items-center gap-3 shadow-sm">
         <AlertTriangle className="h-5 w-5 shrink-0 animate-pulse" />
         <div className="min-w-0 flex-1">
@@ -169,7 +176,7 @@ export function EscalationDecision({
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150"
         >
           <ArrowLeft className="h-4 w-4" />
-          All escalations
+          All Needs You
         </Link>
         <Link
           href={`/agents/${agent.id}`}
@@ -189,16 +196,17 @@ export function EscalationDecision({
         <p className="text-sm text-muted-foreground max-w-2xl">
           Pick a direction. The agent waits until you decide.
         </p>
+        {!isResolved && (
+          <p className="text-xs text-muted-foreground">
+            Shortcuts: 1–9 select · A approve · R revise · Esc asks before abort
+          </p>
+        )}
       </div>
 
       {hintVisible && !isResolved && (
         <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 flex items-start justify-between gap-3 text-xs text-muted-foreground">
           <p>
-            Keyboard: <kbd className="px-1 border border-border rounded bg-background">1–9</kbd>{' '}
-            options · <kbd className="px-1 border border-border rounded bg-background">A</kbd>{' '}
-            approve · <kbd className="px-1 border border-border rounded bg-background">R</kbd>{' '}
-            revise · <kbd className="px-1 border border-border rounded bg-background">Esc</kbd>{' '}
-            abort
+            Same shortcuts work from anywhere on this page — no need to click into a field first.
           </p>
           <button type="button" onClick={dismissHint} className="underline shrink-0">
             Got it
@@ -330,19 +338,48 @@ export function EscalationDecision({
                 variant="destructive"
                 className="min-h-12 h-12"
                 disabled={!!submitting}
-                onClick={() => submit('cancel')}
+                onClick={() => setConfirmAbort(true)}
               >
-                {submitting === 'cancel' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
+                <X className="h-4 w-4" />
                 <span className="flex flex-col items-start leading-none gap-0.5">
                   <span>Abort</span>
                   <kbd className="text-[10px] opacity-70 font-normal">Esc</kbd>
                 </span>
               </Button>
             </div>
+            {confirmAbort && (
+              <div
+                className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 space-y-3"
+                role="alertdialog"
+                aria-labelledby="abort-title"
+              >
+                <p id="abort-title" className="text-sm font-medium">
+                  Stop this agent?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  It will not resume until you launch or recover it again.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="destructive"
+                    disabled={!!submitting}
+                    onClick={() => {
+                      setConfirmAbort(false);
+                      void submit('cancel');
+                    }}
+                  >
+                    {submitting === 'cancel' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Yes, stop agent'
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setConfirmAbort(false)}>
+                    Keep deciding
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       ) : (

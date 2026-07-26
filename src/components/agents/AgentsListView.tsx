@@ -14,12 +14,14 @@ export function AgentsListView({ userId }: { userId: string }) {
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl tracking-tight">Agents</h1>
-          <p className="text-sm text-muted-foreground mt-1">Your crew on the floor.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Everyone working for you — status at a glance.
+          </p>
         </div>
         <Button asChild size="sm">
           <Link href="/agents/new">
             <Plus className="h-4 w-4" />
-            New
+            New agent
           </Link>
         </Button>
       </div>

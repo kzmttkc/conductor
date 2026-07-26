@@ -41,6 +41,9 @@ export default function HomePage() {
             One human. A crew of agents. Clear authority, full visibility, and
             escalations that respect your attention.
           </p>
+          <p className="mt-3 text-base text-[#141414] max-w-xl">
+            Your agents work; you only decide the hard calls.
+          </p>
           <div className="mt-10 flex flex-col sm:flex-row flex-wrap gap-3">
             <Button asChild size="lg" className="min-h-12 w-full sm:w-auto">
               <Link href="/demo">Try live demo — no signup</Link>
@@ -50,7 +53,7 @@ export default function HomePage() {
             </Button>
           </div>
           <p className="mt-4 text-sm text-[#6b6b66]">
-            Public URL: <code className="text-[#141414]">/demo</code> — share it anywhere.
+            Share the live demo link anytime.
           </p>
         </section>
 

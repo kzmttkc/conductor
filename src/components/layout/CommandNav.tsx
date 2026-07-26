@@ -1,12 +1,12 @@
 /**
  * CommandNav — Desktop side rail + Mobile bottom tabs
- * Integrates into AppShell; pendingEscalations from existing hooks.
  */
 
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard,
   Bot,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BrandMark } from '@/components/brand';
+import { MoreMenu } from '@/components/layout/MoreMenu';
 
 const mainNav: {
   href: string;
@@ -38,10 +39,7 @@ const mainNav: {
 
 function NavTooltip({ label }: { label: string }) {
   return (
-    <span
-      role="tooltip"
-      className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-    >
+    <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
       {label}
     </span>
   );
@@ -51,14 +49,21 @@ type Props = {
   pendingEscalations?: number;
   moreSlot?: React.ReactNode;
   hideMobile?: boolean;
+  userName?: string;
 };
 
 export function CommandNav({
   pendingEscalations = 0,
   moreSlot,
   hideMobile = false,
+  userName = 'Commander',
 }: Props) {
   const pathname = usePathname();
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMoreOpen(false);
+  }, [pathname]);
 
   return (
     <>
@@ -116,7 +121,21 @@ export function CommandNav({
           className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-safe"
           aria-label="Mobile"
         >
-          <div className="flex h-14 items-stretch justify-around px-0.5">
+          {mobileMoreOpen && (
+            <button
+              type="button"
+              className="fixed inset-0 z-40 bg-black/20"
+              aria-label="Close menu"
+              onClick={() => setMobileMoreOpen(false)}
+            />
+          )}
+          <MoreMenu
+            userName={userName}
+            open={mobileMoreOpen}
+            onClose={() => setMobileMoreOpen(false)}
+            placement="up"
+          />
+          <div className="relative z-50 flex h-14 items-stretch justify-around px-0.5">
             {mainNav.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -140,23 +159,24 @@ export function CommandNav({
                 </Link>
               );
             })}
-            <Link
-              href="/settings"
-              aria-current={
-                pathname.startsWith('/settings') || pathname.startsWith('/templates')
-                  ? 'page'
-                  : undefined
-              }
+            <button
+              type="button"
+              aria-expanded={mobileMoreOpen}
+              aria-label="More"
+              onClick={() => setMobileMoreOpen((v) => !v)}
               className={cn(
                 'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors duration-150',
-                pathname.startsWith('/settings') || pathname.startsWith('/templates')
+                mobileMoreOpen ||
+                  pathname.startsWith('/settings') ||
+                  pathname.startsWith('/templates') ||
+                  pathname.startsWith('/help')
                   ? 'text-foreground'
                   : 'text-muted-foreground'
               )}
             >
               <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
               <span>More</span>
-            </Link>
+            </button>
           </div>
         </nav>
       )}

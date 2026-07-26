@@ -45,11 +45,12 @@ export default function DemoMomentPage() {
           <NeedsYouMoment />
         </div>
 
-        <p className="mt-8 text-xs text-white/40">
-          Embeddable loop:{' '}
-          <a className="underline underline-offset-2 text-white/60" href="/demo/needs-you.gif">
-            /demo/needs-you.gif
-          </a>
+        <p className="mt-8 text-xs text-white/50 leading-relaxed">
+          Record a 15–30s clip from{' '}
+          <Link href="/demo" className="underline underline-offset-2 text-white/70">
+            /demo
+          </Link>{' '}
+          — follow the steps below.
         </p>
 
         <div className="mt-8">

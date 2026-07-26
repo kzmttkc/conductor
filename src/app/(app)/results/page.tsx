@@ -1,23 +1,40 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FileText, Loader2 } from 'lucide-react';
 import type { Artifact } from '@/lib/supabase/types';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { formatRelativeTime } from '@/lib/utils';
 
 export default function ResultsIndexPage() {
   const [items, setItems] = useState<Artifact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch('/api/artifacts');
-      if (res.ok) setItems(await res.json());
-      setLoading(false);
+      try {
+        const res = await fetch('/api/artifacts');
+        if (!res.ok) {
+          throw new Error('Could not load reports');
+        }
+        setItems(await res.json());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not load reports');
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => item.title.toLowerCase().includes(q));
+  }, [items, query]);
 
   return (
     <div className="space-y-8">
@@ -28,10 +45,28 @@ export default function ResultsIndexPage() {
         </p>
       </div>
 
+      {!loading && !error && items.length > 0 && (
+        <Input
+          type="search"
+          placeholder="Search by title…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="max-w-md"
+          aria-label="Search reports by title"
+        />
+      )}
+
       {loading ? (
         <div className="flex items-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          Loading…
+          Loading reports…
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-urgent/40 bg-urgent/5 px-6 py-8 text-center">
+          <p className="font-medium text-urgent">{error}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Check your connection and try again.
+          </p>
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
@@ -44,9 +79,13 @@ export default function ResultsIndexPage() {
             Launch a template
           </Link>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border px-6 py-10 text-center">
+          <p className="text-sm text-muted-foreground">No reports match &ldquo;{query}&rdquo;</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {items.map((item) => (
+          {filtered.map((item) => (
             <Link key={item.id} href={`/results/${item.id}`} className="block">
               <Card className="hover:bg-card transition-colors bg-card/80">
                 <CardContent className="p-5 flex items-start gap-3">

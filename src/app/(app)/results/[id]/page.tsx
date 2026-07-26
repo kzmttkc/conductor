@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Artifact } from '@/lib/supabase/types';
 import { formatRelativeTime } from '@/lib/utils';
 import { MarkdownReport } from '@/components/results/MarkdownReport';
@@ -25,7 +26,23 @@ export default function ResultPage() {
     })();
   }, [params.id]);
 
-  if (error) return <p className="text-muted-foreground">{error}</p>;
+  if (error) {
+    return (
+      <div className="max-w-md space-y-4 py-12">
+        <p className="text-muted-foreground">
+          This report may have been removed or is no longer available.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/results">View all results</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/dashboard">Back to dashboard</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
   if (!artifact) {
     return (
       <div className="flex items-center text-muted-foreground py-16">
@@ -51,13 +68,27 @@ export default function ResultPage() {
           </p>
           <h1 className="font-display text-4xl tracking-tight mt-2">{artifact.title}</h1>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/results">All results</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              await navigator.clipboard.writeText(artifact.content_markdown);
+              toast.success('Report copied');
+            }}
+          >
+            <Copy className="h-4 w-4" />
+            Copy report
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/results">All results</Link>
+          </Button>
+        </div>
       </div>
       <article className="surface rounded-2xl p-6 md:p-8">
         <p className="text-xs text-muted-foreground mb-4">
-          Deliverable from your crew — use this as the artifact of command.
+          Finished deliverable from your agents — ready to share or edit elsewhere.
         </p>
         <MarkdownReport markdown={artifact.content_markdown} />
       </article>

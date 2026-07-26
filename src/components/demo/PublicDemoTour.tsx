@@ -35,7 +35,7 @@ export function PublicDemoTour({ userId }: { userId: string }) {
                 href={`/escalations/${pending.id}`}
                 className="text-urgent font-medium underline underline-offset-2"
               >
-                Open the escalation
+                Open Needs You
               </Link>{' '}
               — decide in under 3 seconds.
             </>

@@ -46,7 +46,7 @@ export function ShareButtons({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button type="button" variant="outline" size="sm" className={outline} onClick={copy}>
+      <Button type="button" variant="outline" size="sm" className={outline} onClick={copy} aria-label="Copy share link">
         {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
         Copy link
       </Button>
@@ -55,6 +55,7 @@ export function ShareButtons({
           href={`https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`}
           target="_blank"
           rel="noreferrer"
+          aria-label="Share on X"
         >
           <Share2 className="h-4 w-4" />
           Post on X
@@ -65,6 +66,7 @@ export function ShareButtons({
           href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`}
           target="_blank"
           rel="noreferrer"
+          aria-label="Share on LinkedIn"
         >
           LinkedIn
         </a>

@@ -5,7 +5,7 @@
 
 import Link from 'next/link';
 import { BrandInline } from '@/components/brand';
-import { SITE_TAGLINE, SUPPORT_MAILTO } from '@/lib/site';
+import { SITE_TAGLINE, SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/site';
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
@@ -85,7 +85,7 @@ export function SiteFooter() {
                   href={SUPPORT_MAILTO}
                   className="hover:text-[#141414] transition-colors"
                 >
-                  Contact
+                  {SUPPORT_EMAIL}
                 </a>
               </li>
             </ul>

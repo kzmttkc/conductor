@@ -15,13 +15,14 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const demo = isDemoMode();
 
   async function enterDemo() {
     setLoading(true);
     try {
       const res = await fetch('/api/demo/login', { method: 'POST' });
       if (!res.ok) throw new Error('Demo login failed');
-      toast.success('Welcome, Commander');
+      toast.success('Welcome to Conductor');
       router.push('/onboarding');
       router.refresh();
     } catch {
@@ -33,10 +34,6 @@ export default function LoginPage() {
 
   async function magicLink(e: React.FormEvent) {
     e.preventDefault();
-    if (isDemoMode()) {
-      await enterDemo();
-      return;
-    }
     setLoading(true);
     try {
       const supabase = createClient();
@@ -56,10 +53,6 @@ export default function LoginPage() {
   }
 
   async function github() {
-    if (isDemoMode()) {
-      await enterDemo();
-      return;
-    }
     setLoading(true);
     try {
       const supabase = createClient();
@@ -80,53 +73,68 @@ export default function LoginPage() {
     <div className="flex flex-1 items-center justify-center px-5 bg-[#f4f6f3] text-[#141414] py-12">
       <div className="w-full max-w-md">
         <div className="rounded-2xl border border-[#e4e4e0] bg-white/90 p-6 md:p-8 shadow-sm">
-          <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {demo ? 'Try Conductor without an account.' : 'Sign in'}
+          </h1>
           <p className="text-sm text-[#6b6b66] mt-2">
-            Magic Link or GitHub. Demo mode works without Supabase.
+            {demo
+              ? 'Explore the command tower with a local demo session — no signup required.'
+              : 'Sign in with email or GitHub.'}
           </p>
 
-          <form onSubmit={magicLink} className="mt-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required={!isDemoMode()}
-                className="min-h-12"
-              />
-            </div>
-            <Button type="submit" className="w-full min-h-12" disabled={loading}>
-              <Mail className="h-4 w-4" />
-              {isDemoMode() ? 'Continue with Demo' : 'Send magic link'}
-            </Button>
-          </form>
+          {demo ? (
+            <>
+              <Button
+                className="w-full min-h-12 mt-6"
+                onClick={enterDemo}
+                disabled={loading}
+                aria-busy={loading}
+              >
+                {loading ? 'Entering demo…' : 'Enter demo'}
+              </Button>
+              <p className="mt-5 text-xs text-[#6b6b66] leading-relaxed">
+                You&apos;ll get a local command tower with Research Crew, realtime
+                status, and full escalation flow.
+              </p>
+            </>
+          ) : (
+            <>
+              <form onSubmit={magicLink} className="mt-6 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="min-h-12"
+                  />
+                </div>
+                <Button type="submit" className="w-full min-h-12" disabled={loading}>
+                  <Mail className="h-4 w-4" />
+                  Send magic link
+                </Button>
+              </form>
 
-          <div className="my-5 flex items-center gap-3 text-xs text-[#6b6b66]">
-            <div className="h-px flex-1 bg-[#e4e4e0]" />
-            or
-            <div className="h-px flex-1 bg-[#e4e4e0]" />
-          </div>
+              <div className="my-5 flex items-center gap-3 text-xs text-[#6b6b66]">
+                <div className="h-px flex-1 bg-[#e4e4e0]" />
+                or
+                <div className="h-px flex-1 bg-[#e4e4e0]" />
+              </div>
 
-          <Button
-            variant="outline"
-            className="w-full min-h-12"
-            onClick={github}
-            disabled={loading}
-            type="button"
-          >
-            <Github className="h-4 w-4" />
-            Continue with GitHub
-          </Button>
-
-          {isDemoMode() && (
-            <p className="mt-5 text-xs text-[#6b6b66] leading-relaxed">
-              Demo Mode is on. You&apos;ll get a local command tower with Research
-              Crew, realtime status, and full escalation flow — no cloud setup
-              required.
-            </p>
+              <Button
+                variant="outline"
+                className="w-full min-h-12"
+                onClick={github}
+                disabled={loading}
+                type="button"
+              >
+                <Github className="h-4 w-4" />
+                Continue with GitHub
+              </Button>
+            </>
           )}
 
           <p className="mt-6 text-xs text-[#6b6b66]">

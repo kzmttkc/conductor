@@ -37,7 +37,11 @@ export function CommandBanner({ userId }: { userId: string }) {
   if (!top || dismissed === top.id) return null;
 
   return (
-    <div className="sticky top-0 z-40 border-b border-urgent/40 bg-urgent text-white">
+    <div
+      className="sticky top-0 z-40 border-b border-urgent/40 bg-urgent text-white"
+      role="status"
+      aria-live="polite"
+    >
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-2.5 flex items-center gap-3">
         <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse" />
         <div className="min-w-0 flex-1">

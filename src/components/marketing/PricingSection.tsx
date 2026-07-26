@@ -19,13 +19,15 @@ export function PricingSection() {
         {ORDER.map((tier) => {
           const plan = PLAN_LIMITS[tier];
           const featured = tier === 'pro';
+          const ctaHref = tier === 'free' ? '/demo' : '/login';
+          const ctaLabel = tier === 'free' ? 'Try demo' : 'Sign in to upgrade';
           return (
             <div
               key={tier}
               className={
                 featured
-                  ? 'rounded-2xl border border-[#141414] bg-white p-5 shadow-sm'
-                  : 'rounded-2xl border border-[#e4e4e0] bg-white/70 p-5'
+                  ? 'rounded-2xl border border-[#141414] bg-white p-5 shadow-sm flex flex-col'
+                  : 'rounded-2xl border border-[#e4e4e0] bg-white/70 p-5 flex flex-col'
               }
             >
               <p className="text-sm font-medium">{plan.label}</p>
@@ -41,19 +43,16 @@ export function PricingSection() {
                   </>
                 )}
               </p>
-              <ul className="mt-4 space-y-1.5 text-sm text-[#6b6b66]">
+              <ul className="mt-4 space-y-1.5 text-sm text-[#6b6b66] flex-1">
                 <li>{plan.maxAgents} agents</li>
                 <li>~{plan.maxAgentRuns.toLocaleString()} runs / period</li>
               </ul>
+              <Button asChild variant={featured ? 'default' : 'outline'} className="mt-5 w-full min-h-10">
+                <Link href={ctaHref}>{ctaLabel}</Link>
+              </Button>
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-8">
-        <Button asChild className="min-h-11">
-          <Link href="/demo">Try live demo — no signup</Link>
-        </Button>
       </div>
     </section>
   );

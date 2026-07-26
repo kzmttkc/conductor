@@ -17,12 +17,26 @@ export function UsageMeters({
   const limits = PLAN_LIMITS[plan];
   const rows = [
     { label: 'Agents', value: agentCount, max: limits.maxAgents },
-    { label: 'Runs', value: usage.agentRuns, max: limits.maxAgentRuns },
-    { label: 'Tokens ≈', value: usage.tokensApprox, max: limits.maxTokensApprox },
-    { label: 'Escalations', value: usage.escalations, max: null as number | null },
+    { label: 'Agent runs', value: usage.agentRuns, max: limits.maxAgentRuns },
+    {
+      label: 'AI usage (approx)',
+      value: usage.tokensApprox,
+      max: limits.maxTokensApprox,
+    },
+    { label: 'Needs You calls', value: usage.escalations, max: null as number | null },
   ];
+  const softHit =
+    usage.agentRuns >= limits.maxAgentRuns ||
+    usage.tokensApprox >= limits.maxTokensApprox;
 
   return (
+    <div className="space-y-3">
+      {softHit && (
+        <p className="text-xs text-warning rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
+          You&apos;re at or past this period&apos;s soft limit. New runs may be blocked near
+          120% — consider upgrading in Settings.
+        </p>
+      )}
     <div className={cn('grid gap-3', compact ? 'grid-cols-2 md:grid-cols-4' : 'sm:grid-cols-2')}>
       {rows.map((row) => {
         const pct =
@@ -50,6 +64,7 @@ export function UsageMeters({
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

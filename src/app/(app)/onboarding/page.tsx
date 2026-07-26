@@ -16,18 +16,18 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="font-display text-4xl tracking-tight">Welcome, Commander</h1>
+        <h1 className="font-display text-4xl tracking-tight">Welcome</h1>
         <p className="text-muted-foreground mt-3 leading-relaxed">
-          Conductor is not about making agents smarter. It is about making you
-          able to trust and direct a team of them.
+          Conductor helps you direct a team of AI agents — you stay in command
+          while they do the work.
         </p>
       </div>
 
       <ol className="space-y-4">
         {[
-          'Launch a template (Solo Scout on Free, or upgrade for Research Crew).',
-          'Watch the dashboard — Running → Needs You. Decide in under 3 seconds.',
-          'After completion, open Results to read the report your crew produced.',
+          'Pick a template and launch a crew. On Free, try Solo Scout or Content Pipeline.',
+          'Watch the dashboard. When an agent needs your judgment, it shows Needs You — decide in seconds.',
+          'When the run finishes, open Results to read the report your crew produced.',
         ].map((step, i) => (
           <li key={step} className="flex gap-3">
             <span className="h-7 w-7 rounded-full bg-foreground text-background text-sm flex items-center justify-center shrink-0">

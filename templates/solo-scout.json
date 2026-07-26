@@ -1,17 +1,17 @@
 {
   "name": "Solo Scout",
-  "description": "1体のリサーチャーだけを指揮する最小テンプレート。Freeで指揮ループを体験するのに最適。",
+  "description": "One researcher you command. Best Free starting point to feel the Needs You loop.",
   "agents": [
     {
       "name": "Scout",
       "role": "Researcher",
-      "goal": "テーマについて一次情報を集め、判断が必要な点を人間に上げる。",
+      "goal": "Gather primary sources on the theme and escalate when judgment is required.",
       "permissions": {
         "web_search": "allow",
         "browser": "require_approval",
         "file_write": "deny"
       },
-      "system_prompt": "あなたは優秀なリサーチャーです。信頼できる情報を収集し、情報源を明記してください。矛盾・不足・ペイウォールがあればエスカレーションしてください。最終的に短い調査メモを残してください。",
+      "system_prompt": "You are a skilled researcher. Collect trustworthy information and cite sources. Escalate on contradictions, gaps, or paywalls. Leave a short research memo as your final deliverable.",
       "escalation_conditions": ["contradiction", "insufficient_info", "paywall"]
     }
   ]

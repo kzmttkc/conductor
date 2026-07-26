@@ -294,16 +294,16 @@ export function AgentDetailView({ agentId }: { agentId: string }) {
               className="block rounded-xl border border-urgent/40 bg-urgent/5 urgent-ring p-5"
             >
               <p className="text-xs font-medium text-urgent uppercase tracking-wide">
-                Escalation
+                Needs You
               </p>
               <p className="text-sm mt-2 leading-snug font-medium">{pending.summary}</p>
               <p className="text-xs text-urgent mt-4 font-medium">Decide now →</p>
             </Link>
           ) : (
             <div className="surface rounded-xl p-5">
-              <h2 className="font-medium">Escalation</h2>
+              <h2 className="font-medium">Needs You</h2>
               <p className="text-sm text-muted-foreground mt-2">
-                No pending decisions. The agent is not waiting on you.
+                No pending decisions. This agent is not waiting on you.
               </p>
             </div>
           )}
@@ -338,19 +338,29 @@ export function AgentDetailView({ agentId }: { agentId: string }) {
             )}
           </div>
 
-          <div className="surface rounded-xl p-5">
-            <h2 className="font-medium mb-2">Config</h2>
-            <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words max-h-40 overflow-auto">
-              {JSON.stringify(
-                {
-                  theme: agent.config.theme,
-                  goal: agent.config.goal,
-                  escalation_conditions: agent.config.escalation_conditions,
-                },
-                null,
-                2
-              )}
-            </pre>
+          <div className="surface rounded-xl p-5 space-y-3">
+            <h2 className="font-medium">Mission details</h2>
+            <dl className="space-y-2 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Theme</dt>
+                <dd>{String(agent.config.theme || '—')}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Goal</dt>
+                <dd className="leading-relaxed">{String(agent.config.goal || '—')}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Asks you about</dt>
+                <dd>
+                  {Array.isArray(agent.config.escalation_conditions) &&
+                  agent.config.escalation_conditions.length
+                    ? (agent.config.escalation_conditions as string[])
+                        .map((c) => c.replaceAll('_', ' '))
+                        .join(', ')
+                    : 'Judgment calls when needed'}
+                </dd>
+              </div>
+            </dl>
           </div>
         </section>
       </div>

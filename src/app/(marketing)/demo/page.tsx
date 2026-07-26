@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Play, Share2 } from 'lucide-react';
@@ -10,10 +10,39 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShareButtons } from '@/components/marketing/ShareButtons';
 
+const DEMO_THEME_KEY = 'conductor-demo-theme';
+const DEFAULT_THEME = 'Electric vehicle market trends 2026';
+
+function friendlyDemoError(message: string): string {
+  if (
+    message.includes('NEXT_PUBLIC') ||
+    message.includes('Demo Mode') ||
+    message.includes('not available')
+  ) {
+    return 'The live demo is not available right now. Try signing in instead.';
+  }
+  return message;
+}
+
 export default function PublicDemoPage() {
   const router = useRouter();
-  const [theme, setTheme] = useState('AI agent orchestration market 2026');
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_THEME;
+    try {
+      return localStorage.getItem(DEMO_THEME_KEY) || DEFAULT_THEME;
+    } catch {
+      return DEFAULT_THEME;
+    }
+  });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DEMO_THEME_KEY, theme);
+    } catch {
+      // ignore
+    }
+  }, [theme]);
 
   async function start() {
     setLoading(true);
@@ -24,12 +53,16 @@ export default function PublicDemoPage() {
         body: JSON.stringify({ theme }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not start demo');
+      if (!res.ok) {
+        throw new Error(friendlyDemoError(data.error || 'Could not start demo'));
+      }
       toast.success('Demo launched — watch for Needs You');
       router.push(data.next || '/dashboard?tour=1&src=public-demo');
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed');
+      toast.error(
+        err instanceof Error ? err.message : 'Could not start demo. Please try again.'
+      );
       setLoading(false);
     }
   }
@@ -55,7 +88,7 @@ export default function PublicDemoPage() {
 
         <div className="rounded-2xl border border-[#e4e4e0] bg-white/80 p-5 sm:p-6 mt-8 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="theme">Mission theme</Label>
+            <Label htmlFor="theme">What should they research?</Label>
             <Input
               id="theme"
               value={theme}
@@ -63,13 +96,24 @@ export default function PublicDemoPage() {
               className="min-h-12"
             />
           </div>
-          <Button className="w-full min-h-12" size="lg" onClick={start} disabled={loading}>
+          <Button
+            className="w-full min-h-12"
+            size="lg"
+            onClick={start}
+            disabled={loading}
+            aria-busy={loading}
+          >
             {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Starting demo…
+              </>
             ) : (
-              <Play className="h-4 w-4" />
+              <>
+                <Play className="h-4 w-4" />
+                Start public demo
+              </>
             )}
-            Start public demo
           </Button>
           <Button
             variant="outline"
