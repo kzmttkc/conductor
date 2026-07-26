@@ -13,7 +13,7 @@ export default function ResultsIndexPage() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch('/api/demo/artifacts');
+      const res = await fetch('/api/artifacts');
       if (res.ok) setItems(await res.json());
       setLoading(false);
     })();

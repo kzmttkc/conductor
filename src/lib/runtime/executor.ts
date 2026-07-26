@@ -48,15 +48,86 @@ async function runToolWithPermission(
   return 'ok';
 }
 
+function upstreamBlock(agent: Agent) {
+  const upstream = String(agent.config.upstream_reports ?? '').trim();
+  return upstream
+    ? `\n## Upstream crew deliverables\n${upstream.slice(0, 6000)}\n`
+    : '';
+}
+
 function buildReport(agent: Agent, findings: string[], guidance?: string | null) {
   const theme = String(agent.config.theme ?? agent.current_task ?? 'Mission');
   const mode = hasLlmKey() ? 'LLM' : 'Structured runtime';
+  const role = agent.role;
+  const isVerifier = agent.name === 'Verifier' || role === 'Fact Checker';
+  const isEditor = agent.name === 'Editor' || role === 'Editor';
+  const isSynthesizer =
+    agent.name === 'Synthesizer' ||
+    agent.name === 'BriefWriter' ||
+    role === 'Analyst';
+
+  if (isVerifier) {
+    const claims = findings.slice(0, 5);
+    return `# Verification Report — ${theme}
+
+**Role:** ${agent.role}  
+**Mode:** ${mode}  
+**Generated:** ${new Date().toISOString()}
+${upstreamBlock(agent)}
+## Verification summary
+Checked ${claims.length || 'available'} claims against open sources. Confidence is provisional without primary filings.
+${guidance ? `\n**Human guidance applied:** ${guidance}\n` : ''}
+
+## Claim checks
+${
+  claims.length
+    ? claims
+        .map(
+          (f, i) =>
+            `### Claim ${i + 1}\n${f}\n\n- **Status:** Partially corroborated (open web)\n- **Risk:** Figures may lag or conflict across vendors`
+        )
+        .join('\n\n')
+    : '_No discrete claims extracted; review upstream report manually._'
+}
+
+## Residual risks
+- Paywalled or primary sources not fully inspected
+- Market sizing methodologies may not be comparable
+- Recommend commander sign-off before budget decisions
+
+## Recommendation
+Proceed with caveats, or request a deeper primary-source pass.
+`;
+  }
+
+  if (isSynthesizer || isEditor) {
+    return `# ${agent.name} Deliverable — ${theme}
+
+**Role:** ${agent.role}  
+**Mode:** ${mode}  
+**Generated:** ${new Date().toISOString()}
+${upstreamBlock(agent)}
+## Executive brief
+${guidance ? `**Human guidance:** ${guidance}\n\n` : ''}Structured synthesis of upstream research into a decision-ready brief.
+
+## Key points
+${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n') || '1. Upstream context only — expand with commander priorities.'}
+
+## Suggested framing
+Lead with competitive pressure, then growth opportunity, unless the commander chose otherwise.
+
+## Next actions
+- Validate top 2 figures with primary sources
+- Assign owners for follow-up research
+`;
+  }
+
   return `# ${agent.name} Report — ${theme}
 
 **Role:** ${agent.role}  
 **Mode:** ${mode}  
 **Generated:** ${new Date().toISOString()}
-
+${upstreamBlock(agent)}
 ## Executive summary
 ${agent.name} completed a research pass on **${theme}**.
 ${guidance ? `\n**Human guidance applied:** ${guidance}\n` : ''}
@@ -67,21 +138,25 @@ ${findings.map((f, i) => `${i + 1}. ${f}`).join('\n\n')}
 ## Recommended next actions
 - Review conflicting figures before committing budget
 - Validate any paywalled claims with primary filings
-- Re-run Verifier if new sources appear
+- Hand off to the next crew member if this is a pipeline run
 
 ---
 _Produced by Conductor agent runtime._
 `;
 }
 
-/** Deterministic structured pass when no LLM key is configured — still uses real web_search. */
 async function runStructuredPass(
   agent: Agent,
   sink: ExecutorSink,
   humanGuidance?: string | null
 ) {
   const theme = String(agent.config.theme ?? 'the assigned topic');
-  sink.log('thought', `Planning research on “${theme}”.`);
+  const upstream = String(agent.config.upstream_reports ?? '').trim();
+  sink.log('thought', `Planning work on “${theme}”.`);
+  if (upstream) {
+    sink.log('action', 'Reading upstream crew deliverables…');
+    sink.log('result', upstream.slice(0, 800));
+  }
   await sleep(400);
 
   const findings: string[] = [];
@@ -90,59 +165,103 @@ async function runStructuredPass(
     sink.log('thought', `Applying human guidance: ${humanGuidance}`);
   }
 
-  const searchStatus = await runToolWithPermission(sink, 'web_search', async () => {
-    const results = await webSearch(`${theme} market size competitors 2025 2026`, 5);
-    for (const r of results) {
-      findings.push(`**${r.title}**${r.url ? ` — ${r.url}` : ''}\n${r.snippet}`);
+  const wantsSearch =
+    sink.getPermission('web_search') !== 'deny' &&
+    !(agent.role === 'Analyst' && upstream && sink.getPermission('web_search') === 'deny');
+
+  if (wantsSearch && sink.getPermission('web_search') !== 'deny') {
+    const searchStatus = await runToolWithPermission(sink, 'web_search', async () => {
+      const query =
+        agent.name === 'Verifier' || agent.role === 'Fact Checker'
+          ? `${theme} market size verification sources 2025 2026`
+          : `${theme} market size competitors 2025 2026`;
+      const results = await webSearch(query, 5);
+      for (const r of results) {
+        findings.push(`**${r.title}**${r.url ? ` — ${r.url}` : ''}\n${r.snippet}`);
+      }
+      return results.map((r) => `${r.title}: ${r.snippet}`).join('\n\n');
+    });
+    if (searchStatus === 'escalated') return;
+    if (searchStatus === 'denied') {
+      findings.push('Web search denied by commander permissions. Working from role knowledge / upstream only.');
     }
-    return results.map((r) => `${r.title}: ${r.snippet}`).join('\n\n');
-  });
-  if (searchStatus === 'escalated') return;
-  if (searchStatus === 'denied') {
-    findings.push('Web search denied by commander permissions. Working from role knowledge only.');
+  } else if (upstream) {
+    findings.push('Working primarily from upstream crew reports (search denied or unnecessary).');
   }
 
   await sleep(500);
 
-  // Role-based judgment gates (real escalation conditions)
   const conditions = (agent.config.escalation_conditions as string[]) || [];
+  const isPipelineFollower = Boolean(agent.config.pipeline && Number(agent.config.pipeline_index) > 0);
   const shouldEscalate =
     !humanGuidance &&
+    !isPipelineFollower &&
     (agent.name === 'Scout' ||
+      agent.name === 'Drafter' ||
       agent.role === 'Researcher' ||
+      agent.role === 'Writer' ||
       agent.role === 'Monitor' ||
       conditions.includes('contradiction') ||
       agent.name === 'Verifier');
 
-  if (shouldEscalate && findings.length > 0) {
+  // Verifier still escalates once if no human guidance and has findings
+  const verifierEscalate =
+    !humanGuidance &&
+    (agent.name === 'Verifier' || agent.role === 'Fact Checker') &&
+    findings.length > 0 &&
+    !String(humanGuidance || '').includes('confidence');
+
+  if ((shouldEscalate || verifierEscalate) && (findings.length > 0 || upstream)) {
+    // Avoid double-escalating Verifier when shouldEscalate already true
     const summary =
       agent.name === 'Verifier' || agent.role === 'Fact Checker'
         ? `Unable to fully verify a key claim about “${theme}” from open sources. Proceed with a confidence caveat, or block until a primary source is found?`
-        : agent.role === 'Analyst' || agent.name === 'BriefWriter' || agent.name === 'Synthesizer'
+        : agent.role === 'Analyst' ||
+            agent.name === 'BriefWriter' ||
+            agent.name === 'Synthesizer' ||
+            agent.name === 'Editor'
           ? `Priority is ambiguous for “${theme}”. Should the deliverable lead with competitive threats or growth opportunities?`
           : `Sources conflict or are incomplete for “${theme}”. One cluster implies a larger market; another is more conservative. Which framing should I treat as primary?`;
 
-    sink.escalate(
-      summary,
-      [
-        'Approve and continue with current direction',
-        'Narrow scope to primary competitors only',
-        'Pause and request deeper primary sources',
-      ],
-      {
-        theme,
-        findings: findings.slice(0, 3).map((f) => f.replace(/[\u0000-\u001f]+/g, ' ').slice(0, 400)),
-        conditions,
-      }
-    );
-    return;
+    // Pipeline followers (Synthesizer/Editor) skip first-pass escalation unless Verifier
+    if (
+      isPipelineFollower &&
+      agent.name !== 'Verifier' &&
+      agent.role !== 'Fact Checker'
+    ) {
+      // fall through to report
+    } else {
+      sink.escalate(
+        summary,
+        [
+          'Approve and continue with current direction',
+          'Narrow scope to primary competitors only',
+          'Pause and request deeper primary sources',
+        ],
+        {
+          theme,
+          findings: findings.slice(0, 3).map((f) => f.replace(/[\u0000-\u001f]+/g, ' ').slice(0, 400)),
+          conditions,
+          has_upstream: Boolean(upstream),
+        }
+      );
+      return;
+    }
   }
 
   sink.setStatus('running', `Writing deliverable for ${theme}`);
   sink.log('action', `${agent.name} composing final report…`);
   await sleep(600);
 
-  const report = buildReport(agent, findings.length ? findings : ['No external findings captured.'], humanGuidance);
+  if (upstream && findings.length < 2) {
+    findings.push(`Integrated upstream context (${Math.min(upstream.length, 6000)} chars).`);
+  }
+
+  const report = buildReport(
+    agent,
+    findings.length ? findings : ['No external findings captured.'],
+    humanGuidance
+  );
   sink.saveReport(`${agent.name}: ${theme}`, report);
   sink.log('result', 'Report saved.');
   sink.setStatus('completed', 'Completed — report ready');
@@ -156,8 +275,12 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
       `You are ${agent.name}, a ${agent.role}. Be precise. Escalate when judgment is required.`
   );
   const allowWeb = sink.getPermission('web_search') === 'allow';
+  const upstream = String(agent.config.upstream_reports ?? '').trim();
 
-  if (sink.getPermission('web_search') === 'require_approval' && !humanGuidance?.toLowerCase().includes('allow')) {
+  if (
+    sink.getPermission('web_search') === 'require_approval' &&
+    !humanGuidance?.toLowerCase().includes('allow')
+  ) {
     const status = await runToolWithPermission(sink, 'web_search', async () => 'pending approval');
     if (status === 'escalated') return;
   }
@@ -170,10 +293,15 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
       `Mission theme: ${theme}`,
       `Goal: ${String(agent.config.goal ?? agent.current_task ?? '')}`,
       humanGuidance ? `Human guidance: ${humanGuidance}` : 'No human guidance yet.',
+      upstream ? `\nUpstream crew reports:\n${upstream.slice(0, 8000)}` : '',
       '',
-      'Do useful research. If sources conflict or judgment is needed, call escalate_to_human.',
+      agent.name === 'Verifier' || agent.role === 'Fact Checker'
+        ? 'Verify important claims. Call escalate_to_human if a material claim cannot be corroborated.'
+        : 'Do useful research. If sources conflict or judgment is needed, call escalate_to_human.',
       'Otherwise produce a concise markdown report in your final answer.',
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const { text, escalated, tokensApprox } = await runLlmAgentPass({
       system,
@@ -199,7 +327,7 @@ async function runLlmPass(agent: Agent, sink: ExecutorSink, humanGuidance?: stri
 
     const report =
       text.trim().length > 40
-        ? text
+        ? `${text}${upstream ? `\n\n---\n\n_Upstream context was provided to this agent._` : ''}`
         : buildReport(agent, ['LLM returned a short answer; structured fallback used.'], humanGuidance);
 
     sink.saveReport(`${agent.name}: ${theme}`, report);

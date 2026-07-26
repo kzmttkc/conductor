@@ -14,7 +14,7 @@ export default function EscalationsPage() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const res = await fetch('/api/demo/escalations');
+      const res = await fetch('/api/escalations');
       if (!res.ok) return;
       const data = (await res.json()) as Escalation[];
       if (!cancelled) {

@@ -24,8 +24,7 @@ export function useEscalations(userId: string | null) {
   const booted = useRef(false);
 
   const fetchAll = useCallback(async (opts?: { notify?: boolean }) => {
-    if (!isDemoMode()) return;
-    const res = await fetch('/api/demo/escalations?status=pending');
+    const res = await fetch('/api/escalations?status=pending');
     if (!res.ok) return;
     const data = (await res.json()) as Escalation[];
     if (opts?.notify && booted.current) {
@@ -52,12 +51,10 @@ export function useEscalations(userId: string | null) {
       }
     })();
 
-    if (!isDemoMode()) return;
-
-    // Cookie-backed demo on Vercel: SSE cannot share process memory — poll instead.
     const onVercel = Boolean(process.env.NEXT_PUBLIC_VERCEL_ENV);
-    const pollMs = onVercel ? 2000 : 8000;
-    const es = onVercel ? null : new EventSource('/api/demo/events');
+    const pollMs = isDemoMode() && onVercel ? 2000 : 5000;
+    const es =
+      isDemoMode() && !onVercel ? new EventSource('/api/events') : null;
 
     if (es) {
       es.onmessage = (event) => {
@@ -94,7 +91,10 @@ export function useEscalations(userId: string | null) {
       };
     }
 
-    const poll = setInterval(() => void fetchAll({ notify: onVercel }), pollMs);
+    const poll = setInterval(
+      () => void fetchAll({ notify: !es }),
+      pollMs
+    );
     return () => {
       es?.close();
       clearInterval(poll);

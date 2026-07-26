@@ -50,7 +50,7 @@ export function EscalationDecision({
     }
     setSubmitting(action);
     try {
-      const res = await fetch(`/api/demo/escalations/${escalation.id}`, {
+      const res = await fetch(`/api/escalations/${escalation.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

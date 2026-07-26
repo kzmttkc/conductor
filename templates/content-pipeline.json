@@ -1,0 +1,30 @@
+{
+  "name": "Content Pipeline",
+  "description": "Draft → Edit の2体パイプライン。前段の成果物を次段が読み、指揮感のあるコンテンツ制作ループ（Free可）。",
+  "agents": [
+    {
+      "name": "Drafter",
+      "role": "Writer",
+      "goal": "テーマについて構成案と初稿を書く。事実が曖昧ならエスカレーションする。",
+      "permissions": {
+        "web_search": "allow",
+        "browser": "deny",
+        "file_write": "allow"
+      },
+      "system_prompt": "あなたは実務寄りのライターです。与えられたテーマで見出し付きの初稿を書いてください。根拠が弱い主張は人間に確認してください。",
+      "escalation_conditions": ["insufficient_info", "brand_voice_unclear"]
+    },
+    {
+      "name": "Editor",
+      "role": "Editor",
+      "goal": "前段ドラフトを読み、簡潔・正確・実行可能な最終稿に整える。",
+      "permissions": {
+        "web_search": "require_approval",
+        "browser": "deny",
+        "file_write": "allow"
+      },
+      "system_prompt": "あなたは厳格な編集者です。前段の成果物を前提に、冗長を削り、主張の根拠を整え、最終稿を出してください。重大な事実確認が必要ならエスカレーションしてください。",
+      "escalation_conditions": ["unverifiable_claim", "tone_mismatch"]
+    }
+  ]
+}

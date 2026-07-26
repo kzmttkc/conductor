@@ -2,7 +2,6 @@ import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import type {
   Agent,
-  AgentDefinition,
   AgentLog,
   Artifact,
   Escalation,
@@ -12,11 +11,10 @@ import type {
   ToolName,
   UsageStats,
 } from '@/lib/supabase/types';
-import { normalizePermission } from '@/lib/supabase/types';
+import { normalizePermission, PLAN_LIMITS } from '@/lib/supabase/types';
 import { executeAgentPass } from '@/lib/runtime/executor';
-import researchCrew from '../../../templates/research-crew.json';
-import competitorWatch from '../../../templates/competitor-watch.json';
-import soloScout from '../../../templates/solo-scout.json';
+import { attachPipelineConfig } from '@/lib/runtime/pipeline';
+import { getBundledTemplate, listBundledTemplates } from '@/lib/templates/catalog';
 
 /** @deprecated Prefer visitorFromSession — kept for scripts/fixtures */
 export const DEMO_USER = {
@@ -58,19 +56,7 @@ export class DemoStore extends EventEmitter {
   }
 
   private seedTemplates() {
-    const pack = [
-      { id: '11111111-1111-4111-8111-111111111111', json: researchCrew },
-      { id: '22222222-2222-4222-8222-222222222222', json: competitorWatch },
-      { id: '33333333-3333-4333-8333-333333333333', json: soloScout },
-    ];
-    this.templates = pack.map(({ id, json }) => ({
-      id,
-      name: json.name,
-      description: json.description,
-      agent_definitions: json.agents as AgentDefinition[],
-      is_public: true,
-      created_at: new Date().toISOString(),
-    }));
+    this.templates = listBundledTemplates();
   }
 
   private now() {
@@ -381,8 +367,41 @@ export class DemoStore extends EventEmitter {
 
   async launchTemplateAndRun(userId: string, templateId: string, theme: string) {
     const created = this.launchTemplate(userId, templateId, theme);
-    await Promise.all(created.map((agent) => this.startRuntime(agent.id)));
+    const meta = getBundledTemplate(templateId);
+    const pipeline = Boolean(meta?.pipeline && created.length > 1);
+    for (const patch of attachPipelineConfig(created, pipeline)) {
+      this.updateAgent(patch.id, { config: patch.config });
+    }
+    if (pipeline) {
+      await this.startRuntime(created[0].id);
+    } else {
+      await Promise.all(created.map((agent) => this.startRuntime(agent.id)));
+    }
     return created.map((a) => this.getAgent(a.id)!);
+  }
+
+  private async continuePipeline(completedId: string) {
+    const agent = this.getAgent(completedId);
+    if (!agent?.config.pipeline) return;
+    const nextId = agent.config.pipeline_next as string | null;
+    if (!nextId) return;
+    const pipelineIds = (agent.config.pipeline_ids as string[]) || [];
+    const index = Number(this.getAgent(nextId)?.config.pipeline_index ?? 0);
+    const chunks: string[] = [];
+    for (let i = 0; i < index; i++) {
+      const art = this.getLatestArtifactForAgent(pipelineIds[i]);
+      if (art) chunks.push(`### Upstream: ${art.title}\n\n${art.content_markdown}`);
+    }
+    const next = this.getAgent(nextId);
+    if (!next) return;
+    this.updateAgent(nextId, {
+      config: {
+        ...next.config,
+        upstream_reports: chunks.join('\n\n---\n\n'),
+      },
+      current_task: `Continuing pipeline after ${agent.name}`,
+    });
+    await this.startRuntime(nextId);
   }
 
   private makeSink(agentId: string) {
@@ -446,15 +465,67 @@ export class DemoStore extends EventEmitter {
     this.addLog(agentId, 'action', 'Stopped by commander');
   }
 
+  assertUsageBudget(userId: string) {
+    const plan = this.getPlan(userId);
+    const limits = PLAN_LIMITS[plan];
+    if (this.usage.agentRuns >= limits.maxAgentRuns) {
+      const err = new Error(
+        `Plan limit: ${limits.label} allows ~${limits.maxAgentRuns} agent runs this period.`
+      ) as Error & { code: string };
+      err.code = 'USAGE_LIMIT';
+      throw err;
+    }
+    if (this.usage.tokensApprox >= limits.maxTokensApprox) {
+      const err = new Error(
+        `Plan limit: ${limits.label} token budget (~${limits.maxTokensApprox}) reached.`
+      ) as Error & { code: string };
+      err.code = 'USAGE_LIMIT';
+      throw err;
+    }
+  }
+
   async startRuntime(agentId: string, humanGuidance?: string | null) {
     if (this.running.has(agentId)) return;
     this.runtimeAbort.delete(agentId);
-    const agent = this.getAgent(agentId);
+    let agent = this.getAgent(agentId);
     if (!agent) return;
+
+    this.assertUsageBudget(agent.user_id);
+
+    // Cookie slim may drop system_prompt — restore from bundled template
+    if (!agent.config.system_prompt && agent.template_id) {
+      const tmpl = getBundledTemplate(agent.template_id);
+      const def = tmpl?.agent_definitions.find((d) => d.name === agent!.name);
+      if (def?.system_prompt) {
+        agent =
+          this.updateAgent(agentId, {
+            config: { ...agent.config, system_prompt: def.system_prompt, goal: def.goal },
+          }) ?? agent;
+      }
+    }
+
+    // Refresh upstream for pipeline followers at start time
+    if (agent.config.pipeline && Number(agent.config.pipeline_index) > 0) {
+      const pipelineIds = (agent.config.pipeline_ids as string[]) || [];
+      const index = Number(agent.config.pipeline_index ?? 0);
+      const chunks: string[] = [];
+      for (let i = 0; i < index; i++) {
+        const art = this.getLatestArtifactForAgent(pipelineIds[i]);
+        if (art) chunks.push(`### Upstream: ${art.title}\n\n${art.content_markdown}`);
+      }
+      agent =
+        this.updateAgent(agentId, {
+          config: { ...agent.config, upstream_reports: chunks.join('\n\n---\n\n') },
+        }) ?? agent;
+    }
 
     this.running.add(agentId);
     try {
       await executeAgentPass(agent, this.makeSink(agentId), { humanGuidance });
+      const after = this.getAgent(agentId);
+      if (after?.status === 'completed') {
+        await this.continuePipeline(agentId);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Runtime failed';
       this.addLog(agentId, 'error', message);
@@ -468,7 +539,16 @@ export class DemoStore extends EventEmitter {
     await this.startRuntime(agentId, humanResponse);
   }
 
-  async recoverAgent(agentId: string) {
+  async recoverAgent(agentId: string, opts?: { allowWebSearch?: boolean }) {
+    if (opts?.allowWebSearch) {
+      const agent = this.getAgent(agentId);
+      if (agent) {
+        this.updateAgent(agentId, {
+          permissions: { ...agent.permissions, web_search: 'allow' },
+        });
+        this.addLog(agentId, 'action', 'Commander loosened web_search → Allow for retry');
+      }
+    }
     this.addLog(agentId, 'action', 'Commander requested recovery / retry');
     await this.startRuntime(agentId, 'Retry after error. Prefer safe sources.');
   }

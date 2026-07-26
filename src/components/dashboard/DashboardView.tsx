@@ -9,21 +9,34 @@ import { AgentCard } from '@/components/agents/AgentCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PublicDemoTour } from '@/components/demo/PublicDemoTour';
-import type { Artifact } from '@/lib/supabase/types';
+import type { Artifact, PlanTier, UsageStats } from '@/lib/supabase/types';
+import { UsageMeters } from '@/components/usage/UsageMeters';
 
 export function DashboardView({ userId }: { userId: string }) {
   const { agents, loading } = useAgents(userId);
   const { escalations } = useEscalations(userId);
   const [reportAgentIds, setReportAgentIds] = useState<Set<string>>(new Set());
+  const [plan, setPlan] = useState<PlanTier>('free');
+  const [usage, setUsage] = useState<UsageStats | null>(null);
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch('/api/demo/artifacts');
+      const res = await fetch('/api/artifacts');
       if (!res.ok) return;
       const data = (await res.json()) as Artifact[];
       setReportAgentIds(new Set(data.map((a) => a.agent_id)));
     })();
   }, [agents]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch('/api/plan');
+      if (!res.ok) return;
+      const data = await res.json();
+      setPlan(data.plan);
+      setUsage(data.usage);
+    })();
+  }, [agents.length]);
 
   const running = agents.filter((a) => a.status === 'running').length;
   const needsYou = agents.filter((a) => a.status === 'waiting_human').length;
@@ -71,6 +84,18 @@ export function DashboardView({ userId }: { userId: string }) {
         <Stat label="Errors" value={errors} tone={errors ? 'urgent' : 'default'} />
         <Stat label="Completed" value={completed} tone="default" href="/results" />
       </div>
+
+      {usage && (
+        <section className="surface rounded-xl p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium">Usage this period</h2>
+            <Link href="/settings" className="text-xs text-muted-foreground hover:text-foreground">
+              Plans →
+            </Link>
+          </div>
+          <UsageMeters plan={plan} usage={usage} agentCount={agents.length} compact />
+        </section>
+      )}
 
       {needsYou > 0 && (
         <Link

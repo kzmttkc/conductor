@@ -25,7 +25,7 @@ export default function NewAgentPage() {
   });
 
   async function upgrade(to: PlanTier) {
-    const res = await fetch('/api/demo/plan', {
+    const res = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan: to }),
@@ -43,7 +43,7 @@ export default function NewAgentPage() {
     setLoading(true);
     setLimitError(null);
     try {
-      const res = await fetch('/api/demo/agents', {
+      const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

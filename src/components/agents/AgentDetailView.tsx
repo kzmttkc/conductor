@@ -43,7 +43,7 @@ export function AgentDetailView({ agentId }: { agentId: string }) {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/demo/agents/${agentId}`);
+    const res = await fetch(`/api/agents/${agentId}`);
     if (!res.ok) {
       setLoading(false);
       return;
@@ -62,26 +62,35 @@ export function AgentDetailView({ agentId }: { agentId: string }) {
     return () => clearInterval(t);
   }, [load]);
 
-  async function control(action: 'start' | 'stop' | 'recover') {
-    const res = await fetch(`/api/demo/agents/${agentId}`, {
+  async function control(
+    action: 'start' | 'stop' | 'recover',
+    extra?: { allow_web_search?: boolean }
+  ) {
+    const res = await fetch(`/api/agents/${agentId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...extra }),
     });
     if (!res.ok) {
-      toast.error('Control failed');
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || 'Control failed');
       return;
     }
     setAgent(await res.json());
     toast.success(
-      action === 'start' ? 'Agent started' : action === 'stop' ? 'Agent stopped' : 'Retrying…'
+      action === 'start'
+        ? 'Agent started — new permissions apply now'
+        : action === 'stop'
+          ? 'Agent stopped'
+          : 'Retrying with current permissions…'
     );
+    void load();
   }
 
   async function setPermission(tool: ToolName, level: PermissionLevel) {
     if (!agent) return;
     const permissions = { ...agent.permissions, [tool]: level };
-    const res = await fetch(`/api/demo/agents/${agentId}`, {
+    const res = await fetch(`/api/agents/${agentId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ permissions }),
@@ -91,11 +100,16 @@ export function AgentDetailView({ agentId }: { agentId: string }) {
       return;
     }
     setAgent(await res.json());
+    toast.success(
+      `${tool.replaceAll('_', ' ')} → ${
+        level === 'require_approval' ? 'Ask me' : level === 'allow' ? 'Allow' : 'Deny'
+      }`
+    );
   }
 
   async function remove() {
     if (!confirm('Delete this agent?')) return;
-    const res = await fetch(`/api/demo/agents/${agentId}`, { method: 'DELETE' });
+    const res = await fetch(`/api/agents/${agentId}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');
       return;
@@ -202,16 +216,35 @@ export function AgentDetailView({ agentId }: { agentId: string }) {
               Stop
             </Button>
             {agent.status === 'error' && (
-              <Button variant="success" size="sm" onClick={() => control('recover')}>
-                <RotateCcw className="h-4 w-4" />
-                Retry
-              </Button>
+              <>
+                <Button variant="success" size="sm" onClick={() => control('recover')}>
+                  <RotateCcw className="h-4 w-4" />
+                  Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => control('recover', { allow_web_search: true })}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Retry + Allow search
+                </Button>
+              </>
             )}
             <Button variant="destructive" size="sm" onClick={remove}>
               <Trash2 className="h-4 w-4" />
               Delete
             </Button>
           </div>
+
+          {Boolean(agent.config.pipeline) && (
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Pipeline step {(Number(agent.config.pipeline_index) || 0) + 1}
+              {agent.config.pipeline_next
+                ? ' — next agent reads this report when complete.'
+                : ' — final stage.'}
+            </p>
+          )}
         </section>
 
         {/* Col 2 — Live activity stream */}

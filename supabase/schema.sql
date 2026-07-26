@@ -113,3 +113,16 @@ create policy "Users can view own usage" on usage_stats
   for all using (auth.uid() = user_id);
 
 alter publication supabase_realtime add table artifacts;
+
+-- Optional: seed bundled templates (IDs must match src/lib/templates/catalog.ts)
+-- Application also ships JSON templates and does not require this seed to launch.
+insert into templates (id, name, description, agent_definitions, is_public)
+values
+  (
+    '11111111-1111-4111-8111-111111111111',
+    'Market Research Crew',
+    'Scout → Synthesizer → Verifier pipeline',
+    '[]'::jsonb,
+    true
+  )
+on conflict (id) do nothing;

@@ -3,6 +3,8 @@ import Stripe from 'stripe';
 import { getDemoStore } from '@/lib/demo/store';
 import { isDemoMode } from '@/lib/config';
 import type { PlanTier } from '@/lib/supabase/types';
+import { PLAN_LIMITS } from '@/lib/supabase/types';
+import { createAdminClient, hasAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -28,10 +30,24 @@ export async function POST(request: Request) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const plan = session.metadata?.plan as PlanTier | undefined;
-    // Demo store can reflect plan for local dogfooding; prod would update profiles table.
-    if (plan && isDemoMode()) {
-      const userId = session.metadata?.userId;
-      if (userId) getDemoStore().setPlan(userId, plan);
+    const userId = session.metadata?.userId;
+
+    if (plan && PLAN_LIMITS[plan] && userId) {
+      if (isDemoMode()) {
+        getDemoStore().setPlan(userId, plan);
+      } else if (hasAdminClient()) {
+        const admin = createAdminClient();
+        const { data: existing } = await admin
+          .from('usage_stats')
+          .select('user_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (existing) {
+          await admin.from('usage_stats').update({ plan }).eq('user_id', userId);
+        } else {
+          await admin.from('usage_stats').insert({ user_id: userId, plan });
+        }
+      }
     }
   }
 

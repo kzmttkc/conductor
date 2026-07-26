@@ -1,29 +1,26 @@
 import { inngest } from './client';
 import { getDemoStore } from '@/lib/demo/store';
 import { isDemoMode } from '@/lib/config';
+import { resumeProdAgent } from '@/lib/runtime/prod-runner';
 
-/**
- * Resume an agent after a human resolves an escalation.
- * In production this would wake a LangGraph checkpoint; in demo it drives the local runtime.
- */
 export const resumeAgentAfterHuman = inngest.createFunction(
   { id: 'resume-agent-after-human' },
   { event: 'conductor/escalation.resolved' },
-  async ({ event, step }) => {
-    const { agentId, humanResponse } = event.data as {
+  async ({ event }) => {
+    const { agentId, humanResponse, action } = event.data as {
       agentId: string;
       humanResponse: string;
+      action?: string;
     };
+    if (action === 'cancel') return { skipped: true };
 
-    await step.run('resume-runtime', async () => {
-      if (isDemoMode()) {
-        getDemoStore().resumeAgent(agentId, humanResponse);
-      }
-      // Production: load LangGraph checkpoint and continue with humanResponse injected.
-      return { agentId, resumed: true };
-    });
+    if (isDemoMode()) {
+      await getDemoStore().resumeAgent(agentId, humanResponse);
+      return { resumed: agentId, mode: 'demo' };
+    }
 
-    return { ok: true };
+    await resumeProdAgent(agentId, humanResponse);
+    return { resumed: agentId, mode: 'prod' };
   }
 );
 

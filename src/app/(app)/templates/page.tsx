@@ -28,7 +28,7 @@ export default function TemplatesPage() {
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch('/api/demo/templates');
+      const res = await fetch('/api/templates');
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates ?? data);
@@ -40,7 +40,7 @@ export default function TemplatesPage() {
   }, []);
 
   async function upgrade(to: PlanTier) {
-    const res = await fetch('/api/demo/plan', {
+    const res = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan: to }),
@@ -62,7 +62,7 @@ export default function TemplatesPage() {
     setLaunching(templateId);
     setLimitError(null);
     try {
-      const res = await fetch('/api/demo/templates', {
+      const res = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ template_id: templateId, theme }),

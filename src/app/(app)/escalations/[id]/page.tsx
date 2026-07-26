@@ -18,7 +18,7 @@ export default function EscalationDetailPage() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const res = await fetch(`/api/demo/escalations/${params.id}`);
+      const res = await fetch(`/api/escalations/${params.id}`);
       if (!res.ok) {
         if (!cancelled) setError('Escalation not found');
         return;

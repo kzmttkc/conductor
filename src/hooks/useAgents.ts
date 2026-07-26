@@ -10,7 +10,7 @@ export function useAgents(userId: string | null) {
   const [loading, setLoading] = useState(true);
 
   const fetchDemo = useCallback(async () => {
-    const res = await fetch('/api/demo/agents');
+    const res = await fetch('/api/agents');
     if (!res.ok) throw new Error('Failed to fetch agents');
     const data = (await res.json()) as Agent[];
     setAgents(data);
@@ -39,7 +39,7 @@ export function useAgents(userId: string | null) {
       // Cookie-backed demo on Vercel: SSE cannot share process memory — poll instead.
       const pollMs = process.env.NEXT_PUBLIC_VERCEL_ENV ? 2000 : 8000;
       const es =
-        process.env.NEXT_PUBLIC_VERCEL_ENV ? null : new EventSource('/api/demo/events');
+        process.env.NEXT_PUBLIC_VERCEL_ENV ? null : new EventSource('/api/events');
       if (es) {
         es.onmessage = (event) => {
           try {

@@ -8,7 +8,7 @@ export default function OnboardingPage() {
   const router = useRouter();
 
   async function skip() {
-    await fetch('/api/demo/onboarded', { method: 'POST' });
+    await fetch('/api/onboarded', { method: 'POST' });
     router.push('/dashboard');
     router.refresh();
   }

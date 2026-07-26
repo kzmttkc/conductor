@@ -88,11 +88,11 @@ export function readSnapshotFromCookieHeader(cookieHeader: string | null): DemoS
   return decodeSnapshot(value);
 }
 
-function slimSnapshot(store: DemoStore, userId: string): DemoSnapshot {
+function slimSnapshot(store: DemoStore, userId: string, artifactChars = 900): DemoSnapshot {
   const snap = snapshotForUser(store, userId);
-  snap.logs = snap.logs.slice(-12).map((l) => ({
+  snap.logs = snap.logs.slice(-8).map((l) => ({
     ...l,
-    content: (l.content ?? '').slice(0, 400),
+    content: (l.content ?? '').slice(0, 280),
     metadata: {},
   }));
   snap.escalations = snap.escalations.slice(0, 4).map((e) => ({
@@ -103,18 +103,33 @@ function slimSnapshot(store: DemoStore, userId: string): DemoSnapshot {
       reason: typeof e.context?.reason === 'string' ? e.context.reason : undefined,
     },
   }));
-  snap.artifacts = snap.artifacts.slice(0, 2).map((a) => ({
+  // Keep one stub per agent so Results / pipeline handoff survive cookies
+  const byAgent = new Map<string, (typeof snap.artifacts)[number]>();
+  for (const a of snap.artifacts) {
+    if (!byAgent.has(a.agent_id)) byAgent.set(a.agent_id, a);
+  }
+  snap.artifacts = [...byAgent.values()].slice(0, 4).map((a) => ({
     ...a,
-    content_markdown: a.content_markdown.slice(0, 1800),
+    content_markdown: a.content_markdown.slice(0, artifactChars),
   }));
   snap.agents = snap.agents.map((a) => ({
     ...a,
     current_task: a.current_task?.slice(0, 240) ?? null,
     config: {
       theme: a.config?.theme,
-      goal: typeof a.config?.goal === 'string' ? a.config.goal.slice(0, 200) : a.config?.goal,
-      // Drop bulky system prompts from cookie — runtime can re-read from template
+      goal: typeof a.config?.goal === 'string' ? a.config.goal.slice(0, 160) : a.config?.goal,
       escalation_conditions: a.config?.escalation_conditions,
+      // Preserve pipeline wiring (critical for multi-agent handoff)
+      pipeline: a.config?.pipeline,
+      pipeline_index: a.config?.pipeline_index,
+      pipeline_ids: a.config?.pipeline_ids,
+      pipeline_next: a.config?.pipeline_next,
+      latest_artifact_id: a.config?.latest_artifact_id,
+      // Truncate bulky upstream text in cookie
+      upstream_reports:
+        typeof a.config?.upstream_reports === 'string'
+          ? a.config.upstream_reports.slice(0, 1200)
+          : a.config?.upstream_reports,
     },
   }));
   return snap;
@@ -127,14 +142,15 @@ export function persistStoreToResponse(
 ) {
   if (!cookiePersistenceEnabled()) return;
   let encoded = encodeSnapshot(snapshotForUser(store, userId));
-  if (encoded.length > 3200) {
-    encoded = encodeSnapshot(slimSnapshot(store, userId));
+  if (encoded.length > 3000) {
+    encoded = encodeSnapshot(slimSnapshot(store, userId, 700));
   }
-  // Last resort: drop artifacts entirely
   if (encoded.length > 3500) {
-    const snap = slimSnapshot(store, userId);
-    snap.artifacts = [];
-    snap.logs = snap.logs.slice(-6);
+    encoded = encodeSnapshot(slimSnapshot(store, userId, 320));
+  }
+  if (encoded.length > 3800) {
+    const snap = slimSnapshot(store, userId, 160);
+    snap.logs = snap.logs.slice(-4);
     encoded = encodeSnapshot(snap);
   }
   res.cookies.set(DEMO_STATE_COOKIE, encoded, {

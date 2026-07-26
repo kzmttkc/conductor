@@ -74,15 +74,43 @@ export type PlanTier = 'free' | 'starter' | 'pro' | 'scale';
 
 export interface PlanLimits {
   maxAgents: number;
+  /** Soft monthly agent-run budget (approx) */
+  maxAgentRuns: number;
+  /** Soft monthly token budget (approx) */
+  maxTokensApprox: number;
   label: string;
   price: number;
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
-  free: { maxAgents: 2, label: 'Free', price: 0 },
-  starter: { maxAgents: 5, label: 'Starter', price: 29 },
-  pro: { maxAgents: 15, label: 'Pro', price: 79 },
-  scale: { maxAgents: 50, label: 'Scale', price: 149 },
+  free: {
+    maxAgents: 2,
+    maxAgentRuns: 40,
+    maxTokensApprox: 100_000,
+    label: 'Free',
+    price: 0,
+  },
+  starter: {
+    maxAgents: 5,
+    maxAgentRuns: 300,
+    maxTokensApprox: 1_000_000,
+    label: 'Starter',
+    price: 29,
+  },
+  pro: {
+    maxAgents: 15,
+    maxAgentRuns: 1500,
+    maxTokensApprox: 5_000_000,
+    label: 'Pro',
+    price: 79,
+  },
+  scale: {
+    maxAgents: 50,
+    maxAgentRuns: 10_000,
+    maxTokensApprox: 25_000_000,
+    label: 'Scale',
+    price: 149,
+  },
 };
 
 export interface UsageStats {

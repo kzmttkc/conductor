@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { UsageMeters } from '@/components/usage/UsageMeters';
 import { PLAN_LIMITS, type PlanTier, type UsageStats } from '@/lib/supabase/types';
 import { cn } from '@/lib/utils';
 
@@ -21,7 +22,7 @@ export default function SettingsPage() {
   const [resetting, setResetting] = useState(false);
 
   async function refresh() {
-    const res = await fetch('/api/demo/plan');
+    const res = await fetch('/api/plan');
     if (res.ok) {
       const data = await res.json();
       setPlan(data.plan);
@@ -31,6 +32,15 @@ export default function SettingsPage() {
     }
     setLoading(false);
   }
+
+  // Surface Stripe return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      toast.success('Checkout complete — plan updates when the webhook lands.');
+      void refresh();
+    }
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -56,7 +66,7 @@ export default function SettingsPage() {
       }
     }
 
-    const res = await fetch('/api/demo/plan', {
+    const res = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan: next }),
@@ -77,7 +87,7 @@ export default function SettingsPage() {
     if (!confirm('Clear all agents, logs, reports, and escalations?')) return;
     setResetting(true);
     try {
-      const res = await fetch('/api/demo/reset', { method: 'POST' });
+      const res = await fetch('/api/reset', { method: 'POST' });
       if (!res.ok) throw new Error('Reset failed');
       await refresh();
       toast.success('Demo floor cleared');
@@ -99,31 +109,25 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <section className="surface rounded-xl p-5 space-y-2">
+      <section className="surface rounded-xl p-5 space-y-3">
         <h2 className="font-medium">Current usage</h2>
         <p className="text-sm text-muted-foreground">
           {loading
             ? 'Loading…'
-            : `${agentCount} / ${PLAN_LIMITS[plan].maxAgents} agents · ${PLAN_LIMITS[plan].label}`}
+            : `${PLAN_LIMITS[plan].label} · soft caps enforce runs & tokens before upgrade`}
         </p>
+        {usage && <UsageMeters plan={plan} usage={usage} agentCount={agentCount} />}
         {usage && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
-            {[
-              ['Runs', usage.agentRuns],
-              ['Tool calls', usage.toolCalls],
-              ['Escalations', usage.escalations],
-              ['Tokens ≈', usage.tokensApprox],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-lg bg-muted/50 p-3">
-                <p className="text-[11px] text-muted-foreground">{label}</p>
-                <p className="text-xl font-semibold mt-0.5">{value}</p>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Tool calls this period: {usage.toolCalls}
+          </p>
         )}
         {runtime && (
-          <p className="text-xs text-muted-foreground pt-2">
-            Runtime: {runtime.llmEnabled ? `LLM (${runtime.provider})` : 'Structured + web search (set OPENAI_API_KEY or ANTHROPIC_API_KEY for real LLM)'}
+          <p className="text-xs text-muted-foreground pt-1">
+            Runtime:{' '}
+            {runtime.llmEnabled
+              ? `LLM (${runtime.provider})`
+              : 'Structured + web search (set OPENAI_API_KEY or ANTHROPIC_API_KEY for real LLM)'}
           </p>
         )}
       </section>
@@ -156,7 +160,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <p className={`text-sm mt-2 ${active ? 'opacity-80' : 'text-muted-foreground'}`}>
-                Up to {meta.maxAgents} agents
+                Up to {meta.maxAgents} agents · ~{meta.maxAgentRuns} runs / mo
               </p>
               {active && <p className="text-xs mt-3 opacity-70">Current plan</p>}
             </button>
