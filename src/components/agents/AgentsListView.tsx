@@ -1,0 +1,51 @@
+'use client';
+
+import Link from 'next/link';
+import { Loader2, Plus } from 'lucide-react';
+import { useAgents } from '@/hooks/useAgents';
+import { AgentCard } from '@/components/agents/AgentCard';
+import { Button } from '@/components/ui/button';
+
+export function AgentsListView({ userId }: { userId: string }) {
+  const { agents, loading } = useAgents(userId);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl tracking-tight">Agents</h1>
+          <p className="text-sm text-muted-foreground mt-1">Your crew on the floor.</p>
+        </div>
+        <Button asChild size="sm">
+          <Link href="/agents/new">
+            <Plus className="h-4 w-4" />
+            New
+          </Link>
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center text-muted-foreground py-16">
+          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          Loading…
+        </div>
+      ) : agents.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
+          <p className="font-medium">No agents yet</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Launch a template to put a crew on the floor.
+          </p>
+          <Button asChild className="mt-5">
+            <Link href="/templates">Launch template</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {agents.map((agent) => (
+            <AgentCard key={agent.id} agent={agent} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

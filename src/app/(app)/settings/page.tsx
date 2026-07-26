@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { UsageMeters } from '@/components/usage/UsageMeters';
 import { PLAN_LIMITS, type PlanTier, type UsageStats } from '@/lib/supabase/types';
@@ -107,6 +108,11 @@ export default function SettingsPage() {
         <p className="text-muted-foreground mt-2">
           Plans, usage, and runtime. Stripe Checkout runs when keys are configured.
         </p>
+        <div className="mt-4">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/templates">Templates →</Link>
+          </Button>
+        </div>
       </div>
 
       <section className="surface rounded-xl p-5 space-y-3">
